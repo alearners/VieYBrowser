@@ -30,6 +30,15 @@ The installation package is approximately 10 MB in size.
 - Supports external applications accessing internal files via local storage
 - Minimum support for Android 5
 
+### VieY 自研扩展（0.6.0-dev）
+
+- 订阅：RSS/Atom 源管理，兼容阅读 App(Legado) `rssSources.json` 字段，支持导入/导出 `backup.zip` 订阅备份
+- CSP 安全网页字体：`shouldInterceptRequest` 返回同源 `/__vie__/font.ttf` + `font.js`，CSP 白名单内加载，规避 `zhihu.com/appview/special` 这类拦截
+- 用户脚本插件：`.user.js` 导入（粘贴 / URL）、`@match`/`@include` 匹配、启停、脚本市场地址可配
+- ed2k + 多源下载：`ed2k://` 链接解析、MD4/chunk ed2k hash 校验、eD2k 服务器登录/取源（v0.1 骨架）、HTTP 镜像多源分段下载 + 断点续传
+- 悬浮窗浏览：`FloatService`（Service + WebView 浮层，可拖动标题栏，复用字体/资源拦截链）
+- 运行日志、安全浏览拦截、看图模式、MQTT / FTP 协议工具
+
 ---
 
 
@@ -71,6 +80,8 @@ The installation package is approximately 10 MB in size.
 - Support data: blob: file downloads
 - Modular parsing of text/gemini, text/scroll, and other file types
 - Support download functionality for various smolnet protocols
+- （VieY）ed2k 的 P2P 传输段与 Kad/AICH/上传、混淆握手仍待实现，目前只做服务器取源 + HTTP 多源搬运
+- （VieY）插件 `@match` 支持 `*` 通配，尚不支持 `@grant`/`GM_*` 完整语义（可用 `viek.http` 走 Java 代理）
 
 ---
 

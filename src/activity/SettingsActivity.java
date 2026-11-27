@@ -5,6 +5,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.widget.Toast;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -123,6 +124,12 @@ public class SettingsActivity extends BaseActivity {
 		addItem("MQTT 订阅（Paho mqttv3）", v -> startActivity(new Intent(this, MqttActivity.class)));
 		addItem("FTP 目录浏览 / 下载（commons-net）", v -> startActivity(new Intent(this, FtpActivity.class)));
 		addItem("Java 网络代理已启用（页面可用 viek.http）", v -> i.utw("网络代理", "页面脚本可调用 viek.http(url, opts) 经 Java 发起请求，绕同源限制；也可用 viek.fetch。"));
+
+		addSection("插件与下载");
+		addItem("用户脚本插件（.user.js 管理 / 脚本市场）", v -> startActivity(new Intent(this, PluginActivity.class)));
+		addItem("脚本市场地址", v -> showPluginMarketDialog());
+		addItem("ed2k 链接 / HTTP 多源下载", v -> startActivity(new Intent(this, LinkDownloadActivity.class)));
+		addItem("悬浮窗浏览（Service + WebView 浮层）", v -> toggleFloatWindow());
 		
 		textToolbarPosition = addValueItem(getString(R.string.toolbar_position), v -> showToolbarPosDialog());
 		textHomeMode = addValueItem(getString(R.string.home_mode), v -> showHomeModeDialog());
@@ -133,6 +140,40 @@ public class SettingsActivity extends BaseActivity {
 		contentContainer.addView(spacer);
 	}
 	
+	private void showPluginMarketDialog() {
+		android.widget.EditText et = new android.widget.EditText(this);
+		et.setText(PluginStore.marketUrl(this));
+		et.setTextSize(12);
+		new android.app.AlertDialog.Builder(this).setTitle("脚本市场地址")
+				.setView(et)
+				.setPositiveButton("保存", (d, w) -> {
+					PluginStore.setMarketUrl(this, et.getText().toString());
+					Toast.makeText(this, "已保存，可从插件页右上角打开", Toast.LENGTH_SHORT).show();
+				}).setNegativeButton("取消", null).show();
+	}
+
+	private void toggleFloatWindow() {
+		if (!android.provider.Settings.canDrawOverlays(this)) {
+			new android.app.AlertDialog.Builder(this).setTitle("需要悬浮窗权限")
+					.setMessage("请在系统设置里允许“显示在其他应用上层”，开启后回到浏览器，从菜单再次点悬浮窗即可。")
+					.setPositiveButton("去授权", (d, w) -> {
+						try {
+							startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+									android.net.Uri.parse("package:" + getPackageName())));
+						} catch (Exception ignored) {
+						}
+					}).setNegativeButton("取消", null).show();
+			return;
+		}
+		if (FloatService.isShowing()) {
+			FloatService.hide(this);
+			Toast.makeText(this, "悬浮窗已关闭", Toast.LENGTH_SHORT).show();
+		} else {
+			FloatService.show(this, null);
+			Toast.makeText(this, "悬浮窗已打开，可在浮层里拖动标题栏", Toast.LENGTH_SHORT).show();
+		}
+	}
+
 	private void addSection(String title) {
 		TextView tv = new TextView(this);
 		LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/float_bg">
+
+    <LinearLayout android:id="@+id/float_header" android:layout_width="match_parent"
+        android:layout_height="34dp" android:orientation="horizontal"
+        android:gravity="center_vertical" android:paddingStart="10dp">
+        <TextView android:id="@+id/float_title" android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center_vertical" android:singleLine="true"
+            android:text="悬浮窗" android:textSize="11sp" android:textColor="@color/text_primary" />
+        <ImageView android:id="@+id/float_close" android:layout_width="34dp" android:layout_height="34dp"
+            android:padding="9dp" android:src="@drawable/ic_close" />
+    </LinearLayout>
+
+    <WebView android:id="@+id/float_web" android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+</LinearLayout>
