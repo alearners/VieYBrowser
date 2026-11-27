@@ -496,7 +496,7 @@ public class DownloadManager {
 		PendingIntent pi = PendingIntent.getActivity(appContext, id, intent, piFlags);
 		
 		NotificationCompat.Builder b = new NotificationCompat.Builder(appContext, CHANNEL_ID)
-		.setSmallIcon(R.mipmap.ic_launcher)
+		.setSmallIcon(R.mipmap.icon)
 		.setContentTitle(t.fileName == null ? i.getString(R.string.download) : t.fileName)
 		.setContentIntent(pi)
 		.setOnlyAlertOnce(!forceAlert)

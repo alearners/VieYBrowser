@@ -41,6 +41,7 @@
 
         <activity
             android:name=".start"
+            android:exported="true"
             android:theme="@style/StartTheme"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:label="VieY">
@@ -96,6 +97,14 @@
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false" />
+        <activity
+            android:name=".FeedActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false" />
+        <activity
+            android:name=".FeedItemsActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="false" />
         <activity
