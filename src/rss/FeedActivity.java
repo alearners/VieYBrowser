@@ -42,6 +42,16 @@ public class FeedActivity extends BaseActivity {
         findViewById(R.id.feed_add).setOnClickListener(v -> showAddDialog());
         findViewById(R.id.feed_import).setOnClickListener(v -> pickImport());
         findViewById(R.id.feed_export).setOnClickListener(v -> pickExport());
+        findViewById(R.id.feed_all).setOnClickListener(v -> {
+            Intent it = new Intent(this, FeedItemsActivity.class);
+            it.putExtra(FeedItemsActivity.EXTRA_ALL, true);
+            startActivity(it);
+        });
+        findViewById(R.id.feed_favs).setOnClickListener(v -> {
+            Intent it = new Intent(this, FeedItemsActivity.class);
+            it.putExtra(FeedItemsActivity.EXTRA_FAVS, true);
+            startActivity(it);
+        });
 
         adapter = new BaseAdapter() {
             @Override

@@ -24,6 +24,8 @@ public class FeedParser {
 
     public static class Article {
         public String title = "";
+        /** 聚合视图用来标注来源 */
+        public String source = "";
         public String link = "";
         public String pubDate = "";
         public String description = "";

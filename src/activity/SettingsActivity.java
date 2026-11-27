@@ -109,6 +109,26 @@ public class SettingsActivity extends BaseActivity {
 		addSection("订阅");
 		addItem("订阅源管理 / RSS·Atom", v -> startActivity(new Intent(this, FeedActivity.class)));
 		addItem("导入·导出 阅读(Legado) 订阅备份", v -> startActivity(new Intent(this, FeedActivity.class)));
+		addItem("全部订阅文章（聚合时间线）", v -> {
+			Intent it = new Intent(this, FeedItemsActivity.class);
+			it.putExtra(FeedItemsActivity.EXTRA_ALL, true);
+			startActivity(it);
+		});
+		addItem("我的收藏（订阅文章）", v -> {
+			Intent it = new Intent(this, FeedItemsActivity.class);
+			it.putExtra(FeedItemsActivity.EXTRA_FAVS, true);
+			startActivity(it);
+		});
+		addValueItem("正文离线缓存", v -> {
+			long kb = FeedState.cacheSize(this) / 1024;
+			new android.app.AlertDialog.Builder(this)
+					.setTitle("正文离线缓存 " + kb + " KB")
+					.setItems(new String[]{"清空缓存"}, (d, w) -> {
+						FeedState.clearCache(this);
+						Toast.makeText(this, "缓存已清空", Toast.LENGTH_SHORT).show();
+					})
+					.show();
+		});
 		
 		addSection("网页字体");
 		addSwitchItem("网页自定义字体注入（CSP 安全）", FontInject.enabled(this), (v, is) -> FontInject.setEnabled(this, is));

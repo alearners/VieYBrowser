@@ -71,6 +71,8 @@ export ANDROID_HOME=/path/to/android-sdk
 | 全局字体 | 网页字体注入（同源 `font.ttf` + 二进制 FontFace） | `src/util/FontInject.java` |
 
 **未移植（说明）**：
+- 订阅阅读（0.10.0-dev，`src/rss/`）：订阅源管理 →「全部文章」聚合时间线（多源并发抓取、按时间倒序）；点条目进**应用内阅读页**（`FeedReaderActivity` + `ContentExtractor`：先按 Legado `ruleContent` 取值，否则按文本密度挑主容器，去 script/nav/广告块）；长按条目可「原网页 / 收藏 / 标记未读 / 复制链接」
+- 阅读页细节：正文离线缓存（`filesDir/rss/cache/<sha1>.html`，断网自动回落并提示「离线缓存」）、字号 15/17/19/21 循环、跟随夜间模式配色、已读置灰、收藏「★」落 `filesDir/rss/state.json`
 - BT 下载（0.9.0-dev，`src/bt/`）：`.torrent`（BEP-3 单/多文件）与 `magnet:`（BEP-9）双入口；HTTP(S) tracker announce + compact peers；TCP PeerWire 握手 + 分块请求 + **逐片 SHA-1 校验**（与 `pieces` 原文比对，坏片丢回队列重下，完成后整盘复核）
 - BT 补充：BEP-19 HTTP 种子（`url-list` / `httpseeds`，tracker 无 peer 时按 Range 取片，同样逐片校验）；`.bt.state` 逐片续传；`magnet:` / `.torrent` 已注册 `ACTION_VIEW` 深链，点链接直接进下载页并自动开始
 - BT 诚实边界：不做做种/上传、不做 DHT/PEX、仅 HTTP(S) tracker（无 UDP tracker）、HTTP 种子暂只支持单文件种子；无 DHT 时冷门种子可能取不到 peer
