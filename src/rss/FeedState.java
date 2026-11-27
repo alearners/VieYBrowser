@@ -33,25 +33,53 @@ public class FeedState {
         return new File(dir(c), FILE);
     }
 
+    /** 内存缓存：state.json 会被 unreadCount 逐条读，避免每次解析磁盘文件 */
+    private static JSONObject memObj;
+    private static long memMtime = -1L;
+
     public static synchronized JSONObject load(Context c) {
         File f = stateFile(c);
-        if (!f.exists()) return new JSONObject();
+        if (!f.exists()) {
+            memObj = new JSONObject();
+            memMtime = 0L;
+            return memObj;
+        }
+        long m = f.lastModified();
+        if (memObj != null && m == memMtime) return memObj;
         try (InputStream in = new FileInputStream(f)) {
             byte[] buf = new byte[8192];
             StringBuilder sb = new StringBuilder();
             int n;
             while ((n = in.read(buf)) > 0) sb.append(new String(buf, 0, n, "UTF-8"));
-            return new JSONObject(sb.toString());
+            memObj = new JSONObject(sb.toString());
+            memMtime = m;
+            return memObj;
         } catch (Exception e) {
-            return new JSONObject();
+            memObj = new JSONObject();
+            memMtime = m;
+            return memObj;
         }
     }
 
     private static synchronized void save(Context c, JSONObject o) {
         try (OutputStream out = new FileOutputStream(stateFile(c))) {
             out.write(o.toString().getBytes("UTF-8"));
+            out.flush();
         } catch (Exception ignored) {
         }
+        memObj = o;
+        memMtime = stateFile(c).lastModified();
+    }
+
+    /** 已读键集合快照，供批量统计未读 */
+    public static java.util.Set<String> readKeys(Context c) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        JSONObject read = load(c).optJSONObject("read");
+        if (read != null) {
+            java.util.Iterator<String> it = read.keys();
+            while (it.hasNext()) out.add(it.next());
+        }
+        return out;
     }
 
     public static String key(String link) {

@@ -45,7 +45,12 @@ public class FeedStore {
                 JSONObject o = a.optJSONObject(k);
                 if (o != null) list.add(FeedSource.fromLegado(o));
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            // 文件损坏时保留现场，避免下次保存把用户订阅源整片覆盖
+            File bad = new File(f.getParentFile(), "sources.broken-" + System.currentTimeMillis() + ".json");
+            try { f.renameTo(bad); } catch (Exception ignored) {
+            }
+            android.util.Log.w("FeedStore", "sources.json 损坏，已另存为 " + bad.getName(), e);
         }
         return list;
     }
@@ -71,6 +76,42 @@ public class FeedStore {
         list.add(src);
         save(c, list);
         return list.size() - 1;
+    }
+
+    /** 只更新 lastUpdate，绝不增删别的源（refresh 用，避免同 URL 多源互相顶掉） */
+    public static synchronized void touch(Context c, FeedSource src) {
+        List<FeedSource> list = load(c);
+        for (FeedSource x : list) {
+            if (x.url.equals(src.url) && x.displayTitle().equals(src.displayTitle())) {
+                x.lastUpdate = src.lastUpdate;
+                save(c, list);
+                return;
+            }
+        }
+    }
+
+    /** 按「地址 + 名称」原位替换；找不到才新增（编辑器保存用） */
+    public static synchronized void replace(Context c, String oldUrl, String oldName, FeedSource src) {
+        List<FeedSource> list = load(c);
+        for (int k = 0; k < list.size(); k++) {
+            FeedSource x = list.get(k);
+            if (x.url.equals(oldUrl) && x.displayTitle().equals(oldName)) {
+                list.set(k, src);
+                save(c, list);
+                return;
+            }
+        }
+        upsert(c, src);
+    }
+
+    /** 按「地址 + 名称」删单条 */
+    public static synchronized void removeOne(Context c, String url, String name) {
+        List<FeedSource> list = load(c);
+        for (int k = list.size() - 1; k >= 0; k--) {
+            FeedSource x = list.get(k);
+            if (x.url.equals(url) && x.displayTitle().equals(name)) list.remove(k);
+        }
+        save(c, list);
     }
 
     public static synchronized void remove(Context c, String url) {

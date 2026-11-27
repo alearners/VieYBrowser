@@ -195,6 +195,10 @@ public class FeedItemsActivity extends BaseActivity {
             empty.setVisibility(View.GONE);
         }
 
+        // 缓存 3 分钟内不重复联网（手动下拉/长按「立即刷新」不受限）
+        long stale = System.currentTimeMillis() - (allMode ? 0 : FeedRepo.cachedTime(this, src));
+        if (!allMode && stale < 3 * 60 * 1000L && !cached.isEmpty()) return;
+
         new Thread(() -> {
             String err = null;
             List<FeedParser.Article> fresh = new ArrayList<>();

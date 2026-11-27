@@ -28,6 +28,7 @@ public class FeedActivity extends BaseActivity {
     private static final int REQ_IMPORT = 4001;
     private static final int REQ_EXPORT = 4002;
     private static final int REQ_EDIT = 4003;
+    private final java.util.Map<String, Integer> unreadMap = new java.util.HashMap<>();
 
     private final List<FeedSource> data = new ArrayList<>();
     private BaseAdapter adapter;
@@ -82,7 +83,8 @@ public class FeedActivity extends BaseActivity {
                 View v = convertView != null ? convertView : getLayoutInflater().inflate(R.layout.item_feed, parent, false);
                 FeedSource s = data.get(position);
                 ((TextView) v.findViewById(R.id.item_title)).setText(s.displayTitle());
-                int unread = FeedRepo.unreadCount(FeedActivity.this, s);
+                Integer u = unreadMap.get(FeedActivity.k(s));
+                int unread = u == null ? 0 : u;
                 String sub = s.displaySubtitle();
                 if (unread > 0) sub = "未读 " + unread + " · " + sub;
                 else {
@@ -112,7 +114,7 @@ public class FeedActivity extends BaseActivity {
                         } else if (which == 1) {
                             refreshOne(s);
                         } else if (which == 2) {
-                            FeedStore.remove(this, s.url);
+                            FeedStore.removeOne(this, s.url, s.displayTitle());
                             reload();
                         } else {
                             android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
@@ -145,9 +147,16 @@ public class FeedActivity extends BaseActivity {
         }, "feed-refresh-one").start();
     }
 
+    private static String k(FeedSource s) {
+        return s.url + "|" + s.displayTitle();
+    }
+
     private void reload() {
         data.clear();
         data.addAll(FeedStore.load(this));
+        unreadMap.clear();
+        java.util.Set<String> read = FeedState.readKeys(this);
+        for (FeedSource s : data) if (s.enabled) unreadMap.put(k(s), FeedRepo.unreadCount(this, s, read));
         adapter.notifyDataSetChanged();
         TextView t = findViewById(R.id.feed_title);
         int unread = FeedRepo.totalUnread(this);

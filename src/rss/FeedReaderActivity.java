@@ -117,6 +117,7 @@ public class FeedReaderActivity extends BaseActivity {
             return;
         }
         titleView.setText(TextUtils.isEmpty(article.title) ? article.link : article.title);
+        web.getSettings().setJavaScriptEnabled(false);
         new Thread(() -> {
             String page = null;
             String err = null;
@@ -153,6 +154,13 @@ public class FeedReaderActivity extends BaseActivity {
     /** @js: 规则：在页面上下文执行，取返回值（字符串 / 元素 / 元素集合） */
     private void loadByJs(String js) {
         titleView.setText(TextUtils.isEmpty(article.title) ? article.link : article.title);
+        String cached = FeedState.readCache(this, article.link);
+        if (!TextUtils.isEmpty(cached)) {
+            String html = ContentExtractor.wrap(cached, null, article.link,
+                    VieYApp.isDarkMode(this), textZoom);
+            web.loadDataWithBaseURL(article.link, html, "text/html", "UTF-8", null);
+            Toast.makeText(this, "离线缓存，后台更新中", Toast.LENGTH_SHORT).show();
+        }
         // @js: 规则需要在页面上下文执行，临时开启 JS；取到结果后立即关闭再渲染
         web.getSettings().setJavaScriptEnabled(true);
         web.setWebViewClient(new WebViewClient() {
@@ -199,6 +207,7 @@ public class FeedReaderActivity extends BaseActivity {
     }
 
     private void render(String body, String msg) {
+        if (web != null) web.getSettings().setJavaScriptEnabled(false);
         String html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
                 + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                 + "<style>body{padding:24px;font:15px/1.8 sans-serif;color:"
@@ -219,21 +228,14 @@ public class FeedReaderActivity extends BaseActivity {
         int code = conn.getResponseCode();
         if (code >= 400) throw new Exception("HTTP " + code);
         try (InputStream in = conn.getInputStream()) {
-            ByteArrayOutputStream bo = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
-            return bo.toString("UTF-8");
+            return new String(FeedRepo.readBytes(in), FeedRepo.charsetOf(conn));
         }
     }
 
     @Override
     public void onBackPressed() {
-        if (web != null && web.canGoBack()) {
-            web.goBack();
-        } else {
-            super.onBackPressed();
-        }
+        // 阅读页是单篇视图（正文用 loadDataWithBaseURL 渲染，历史里没有可回退的网页），直接退出
+        finish();
     }
 
     @Override

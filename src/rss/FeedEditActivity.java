@@ -24,12 +24,15 @@ public class FeedEditActivity extends BaseActivity {
 
     public static final String EXTRA_SOURCE_JSON = "edit_source_json";
     public static final String EXTRA_IS_NEW = "edit_is_new";
+    public static final String EXTRA_ORIG_URL = "edit_orig_url";
+    public static final String EXTRA_ORIG_NAME = "edit_orig_name";
 
     private EditText etName, etGroup, etUrl, etHeader, etArticles, etTitle, etLink, etDate, etDesc, etImage, etContent, etNext;
     private CheckBox cbEnabled;
     private TextView hint;
     private FeedSource src = new FeedSource();
     private boolean isNew;
+    private String origUrl, origName;
     private final Handler ui = new Handler(Looper.getMainLooper());
 
     @Override
@@ -53,6 +56,8 @@ public class FeedEditActivity extends BaseActivity {
         hint = findViewById(R.id.edit_hint);
 
         isNew = getIntent().getBooleanExtra(EXTRA_IS_NEW, false);
+        origUrl = getIntent().getStringExtra(EXTRA_ORIG_URL);
+        origName = getIntent().getStringExtra(EXTRA_ORIG_NAME);
         String json = getIntent().getStringExtra(EXTRA_SOURCE_JSON);
         if (json != null) {
             try {
@@ -73,7 +78,8 @@ public class FeedEditActivity extends BaseActivity {
                         .setTitle("删除订阅源")
                         .setMessage(src.displayTitle())
                         .setPositiveButton("删除", (d, w) -> {
-                            FeedStore.remove(this, src.url);
+                            FeedStore.removeOne(this, origUrl == null ? src.url : origUrl,
+                                    origName == null ? src.displayTitle() : origName);
                             setResult(RESULT_OK);
                             finish();
                         })
@@ -127,7 +133,8 @@ public class FeedEditActivity extends BaseActivity {
             Toast.makeText(this, "订阅地址不能为空", Toast.LENGTH_SHORT).show();
             return;
         }
-        FeedStore.upsert(this, src);
+        if (!isNew && origUrl != null) FeedStore.replace(this, origUrl, origName == null ? src.displayTitle() : origName, src);
+        else FeedStore.upsert(this, src);
         Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show();
         setResult(RESULT_OK);
         finish();
@@ -184,7 +191,11 @@ public class FeedEditActivity extends BaseActivity {
     public static Intent intent(FeedActivity from, FeedSource s, boolean isNew) {
         Intent it = new Intent(from, FeedEditActivity.class);
         it.putExtra(EXTRA_IS_NEW, isNew);
-        if (s != null) it.putExtra(EXTRA_SOURCE_JSON, s.toLegado().toString());
+        if (s != null) {
+            it.putExtra(EXTRA_SOURCE_JSON, s.toLegado().toString());
+            it.putExtra(EXTRA_ORIG_URL, s.url);
+            it.putExtra(EXTRA_ORIG_NAME, s.displayTitle());
+        }
         return it;
     }
 }

@@ -69,6 +69,23 @@ public class FeedRepo {
     }
 
     private static void saveItems(Context c, FeedSource s, List<FeedParser.Article> items) {
+        // 与旧缓存按 link 合并，新条目优先，最多 KEEP 条
+        List<FeedParser.Article> merged = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (FeedParser.Article a : items) {
+            if (!TextUtils.isEmpty(a.link)) {
+                if (!seen.add(a.link)) continue;
+            }
+            if (merged.size() >= KEEP) break;
+            merged.add(a);
+        }
+        for (FeedParser.Article a : loadItems(c, s)) {
+            if (merged.size() >= KEEP) break;
+            if (TextUtils.isEmpty(a.link)) continue;
+            if (!seen.add(a.link)) continue;
+            merged.add(a);
+        }
+        items = merged;
         try {
             JSONArray a = new JSONArray();
             for (int i = 0; i < Math.min(KEEP, items.size()); i++) {
@@ -96,17 +113,23 @@ public class FeedRepo {
         return f.exists() ? f.lastModified() : 0L;
     }
 
-    public static int unreadCount(Context c, FeedSource s) {
+    /** 用已读快照算未读（批量统计用，避免逐条读 state.json） */
+    public static int unreadCount(Context c, FeedSource s, java.util.Set<String> read) {
         int n = 0;
         for (FeedParser.Article a : loadItems(c, s)) {
-            if (!TextUtils.isEmpty(a.link) && !FeedState.isRead(c, a.link)) n++;
+            if (!TextUtils.isEmpty(a.link) && !read.contains(FeedState.key(a.link))) n++;
         }
         return n;
     }
 
+    public static int unreadCount(Context c, FeedSource s) {
+        return unreadCount(c, s, FeedState.readKeys(c));
+    }
+
     public static int totalUnread(Context c) {
+        java.util.Set<String> read = FeedState.readKeys(c);
         int n = 0;
-        for (FeedSource s : FeedStore.load(c)) if (s.enabled) n += unreadCount(c, s);
+        for (FeedSource s : FeedStore.load(c)) if (s.enabled) n += unreadCount(c, s, read);
         return n;
     }
 
@@ -118,7 +141,7 @@ public class FeedRepo {
         for (FeedParser.Article a : items) a.source = s.displayTitle();
         saveItems(c, s, items);
         s.lastUpdate = System.currentTimeMillis();
-        FeedStore.upsert(c, s);
+        FeedStore.touch(c, s);
         return items.size();
     }
 
@@ -176,15 +199,37 @@ public class FeedRepo {
         int code = conn.getResponseCode();
         if (code >= 400) throw new Exception("HTTP " + code);
         try (InputStream in = conn.getInputStream()) {
-            return readAll(in);
+            return new String(readBytes(in), charsetOf(conn));
         }
     }
 
     static String readAll(InputStream in) throws Exception {
+        return new String(readBytes(in), "UTF-8");
+    }
+
+    static byte[] readBytes(InputStream in) throws Exception {
         ByteArrayOutputStream bo = new ByteArrayOutputStream();
         byte[] buf = new byte[8192];
         int n;
         while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
-        return bo.toString("UTF-8");
+        return bo.toByteArray();
+    }
+
+    /** 从 Content-Type 取 charset，取不到按 UTF-8 */
+    static String charsetOf(HttpURLConnection conn) {
+        try {
+            String ct = conn.getContentType();
+            if (ct != null) {
+                for (String part : ct.split(";")) {
+                    String p = part.trim();
+                    if (p.toLowerCase().startsWith("charset=")) {
+                        String cs = p.substring(8).replace("\"", "").trim();
+                        if (!TextUtils.isEmpty(cs)) return cs;
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return "UTF-8";
     }
 }

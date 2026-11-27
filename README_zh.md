@@ -27,6 +27,7 @@ VieY 是本人 Vie 项目的一个分支，去除了多余功能，保留并且�
 - 备份恢复：直接读取「阅读」的 `backup.zip` 内 `rssSources.json`，按订阅地址去重合并导入；导出为同结构的 `VieY-rss-backup.zip`，可直接在「阅读」里恢复
 - 订阅源规则编辑器（0.11.0-dev）：长按订阅源 →「编辑规则」，可逐字段改 `ruleArticles / ruleTitle / ruleLink / rulePubDate / ruleDescription / ruleImage / ruleContent / ruleNextPage`，`ruleContent` 支持 `@css:` / `@@css:` 选择器与 `@js:` 页面脚本（`@js:` 在阅读页的 WebView 里执行，返回字符串/元素/元素集合，结果走同一套排版）；「测试」按钮抓一次即可看到前 5 条标题与正文预览
 - 定时后台刷新 + 未读角标（0.11.0-dev）：`FeedRefreshJob`（JobScheduler，`setPersisted` 开机续跑）；条目缓存落 `filesDir/rss/items/<sha1>.json`，未读数直接由缓存与已读集合算出，不必联网；订阅列表显示「订阅 (n) · 未读 N」，条目列表显示「未读 N · 时间」
+- 订阅健壮性（0.11.1-dev）：同 URL 的多个订阅源不再互相顶掉（`touch` / `replace` / `removeOne` 按「地址+名称」定位）；条目缓存按 link 与旧缓存合并，不再截断老条目；未读计数每屏只取一次已读快照（原来每行都读一遍 `state.json`）；`@js:` 正文先出离线缓存再后台更新；按 `Content-Type` 探测编码，非 UTF-8 源不再乱码；`sources.json` 损坏时另存为 `sources.broken-*.json` 而非被静默覆盖；共用 `btn_selector` 不再把 32dp 按钮里的文字裁掉上半截
 - 入口：设置 → 订阅
 
 **网页自定义字体（CSP 安全）**
