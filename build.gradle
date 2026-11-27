@@ -10,8 +10,9 @@ android {
         applicationId "kawaii.viey.browser"
         minSdk 21
         targetSdk 34
-        versionCode 202611330
-        versionName "0.11.2-dev"
+        versionCode 202611340
+        versionName "0.11.3-dev"
+        resConfigs 'zh', 'zh-rTW', 'en'
     }
 
     sourceSets {
@@ -53,7 +54,9 @@ android {
 
     packagingOptions {
         resources {
-            excludes += ['META-INF/versions/9/OSGI-INF/MANIFEST.MF', 'META-INF/*.kotlin_module', 'META-INF/LICENSE*', 'META-INF/versions/9/OSGI-INF/*']
+            excludes += ['META-INF/versions/9/OSGI-INF/MANIFEST.MF', 'META-INF/*.kotlin_module', 'META-INF/LICENSE*', 'META-INF/versions/9/OSGI-INF/*',
+            'META-INF/maven/**', 'META-INF/*.txt', 'META-INF/*.md', 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA',
+            'org/bouncycastle/pqc/**', 'org/bouncycastle/**/*.properties', 'META-INF/versions/**']
         }
     }
 

@@ -163,39 +163,7 @@ public class FeedActivity extends BaseActivity {
         t.setText(unread > 0 ? "订阅 (" + data.size() + ") · 未读 " + unread : "订阅 (" + data.size() + ")");
     }
 
-    private void showAddDialog() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        int pad = i.dp2px(16);
-        box.setPadding(pad, pad, pad, 0);
-
-        EditText name = new EditText(this);
-        name.setHint("名称（可留空）");
-        EditText url = new EditText(this);
-        url.setHint("订阅地址 http(s):// 或本地文件");
-        box.addView(name);
-        box.addView(url);
-
-        new AlertDialog.Builder(this)
-                .setTitle("添加订阅源")
-                .setView(box)
-                .setPositiveButton("保存", (d, w) -> {
-                    String u = url.getText().toString().trim();
-                    if (TextUtils.isEmpty(u)) {
-                        Toast.makeText(this, "地址不能为空", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    FeedSource s = new FeedSource();
-                    s.url = u;
-                    s.name = name.getText().toString().trim();
-                    if (s.name.length() == 0) s.name = u;
-                    FeedStore.upsert(this, s);
-                    reload();
-                })
-                .setNegativeButton("取消", null)
-                .show();
-    }
-
+    
     private void pickImport() {
         Intent it = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         it.addCategory(Intent.CATEGORY_OPENABLE);
@@ -246,8 +214,4 @@ public class FeedActivity extends BaseActivity {
         }
     }
 
-    @SuppressWarnings("unused")
-    private void tint(ImageView iv) {
-        // 预留：夜间模式着色
-    }
 }

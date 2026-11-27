@@ -198,7 +198,7 @@ public class scorpion {
             }
             buf.write(b1);
         }
-        return buf.toString(StandardCharsets.US_ASCII);
+        return new String(buf.toByteArray(), StandardCharsets.US_ASCII);
     }
 
     private static byte[] readFullBytes(InputStream in, long maxLen) throws Exception {

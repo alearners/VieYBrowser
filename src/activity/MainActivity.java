@@ -180,7 +180,7 @@ public class MainActivity extends BaseActivity {
 		}
 		nowIndex = index;
 		int newProgress = windowList.get(nowIndex).progress;
-		progressBar.setProgress(newProgress, true);
+		setPageProgress(newProgress);
 		
 		progressBar.setVisibility(newProgress < 100 ? View.VISIBLE : View.GONE);
 		
@@ -334,6 +334,12 @@ public class MainActivity extends BaseActivity {
 	
 	
 	
+	private void setPageProgress(int p) {
+		if (progressBar == null) return;
+		if (android.os.Build.VERSION.SDK_INT >= 24) progressBar.setProgress(p, true);
+		else progressBar.setProgress(p);
+	}
+
 	private void showWindowBottomSheet() {
 		BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this);
 		View sheetView = getLayoutInflater().inflate(R.layout.bottom_sheet_window_list, null);
@@ -609,12 +615,6 @@ public class MainActivity extends BaseActivity {
 	private void initWebView(WebViey webView) {
 		
 		webView.setOnWebViewListener(new WebViey.OnWebViewListener() {
-			/*
-			@Override
-			public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimetype, long contentLength, int webId) {
-			WebUtil.download(url, userAgent, contentDisposition, mimetype, contentLength);
-			}
-			*/
 			@Override
 			public void onPageStarted(String url, int id) {
 				if (!urlEditText.hasFocus() && windowList.get(nowIndex).id == id) {
@@ -682,7 +682,7 @@ public class MainActivity extends BaseActivity {
 					item.progress = newProgress;
 				}
 				if(windowList.get(nowIndex).id == id){
-					progressBar.setProgress(newProgress, true);
+					setPageProgress(newProgress);
 					
 					if(newProgress==100){
 						new Handler(Looper.getMainLooper()).postDelayed(() -> {
@@ -1547,8 +1547,9 @@ public class MainActivity extends BaseActivity {
 				String fileName = "";
 				if (imageUrl.contains("/")) {
 					fileName = imageUrl.substring(imageUrl.lastIndexOf("/") + 1);
-					if (fileName.contains("?"))
-					fileName = fileName.substring(0, fileName.indexOf("?"));
+					if (fileName.contains("?")) {
+						fileName = fileName.substring(0, fileName.indexOf("?"));
+					}
 				}
 				
 				final EditViey edit = new EditViey(MainActivity.this);

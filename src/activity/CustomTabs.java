@@ -517,13 +517,15 @@ public class CustomTabs extends BaseActivity {
 			fillIn.setData(mWeb != null && mWeb.getUrl() != null ? Uri.parse(mWeb.getUrl()) : getIntent().getData());
 			if (Build.VERSION.SDK_INT >= 34) {
 				pi.send(getApplicationContext(), 0, fillIn);
-			} else {
+			} else if (Build.VERSION.SDK_INT >= 23) {
 				Bundle options = null;
 				try {
 					ActivityOptions ao = ActivityOptions.makeBasic();
 					options = ao.toBundle();
 				} catch (Throwable ignored) {}
 				pi.send(getApplicationContext(),0,fillIn,null,null,null,options);
+			} else {
+				pi.send(getApplicationContext(), 0, fillIn);
 			}
 			
 		} catch (Exception e) {

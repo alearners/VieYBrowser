@@ -72,8 +72,8 @@
     <string name="redownloading">Redownload started</string>
     <string name="no_dwontask">No matching download task</string>
     <string name="diy">Custom</string>
-    <string name="bookmarks_count">%1$s bookmarks</string>
-    <string name="folder_count">%1$s folders</string>
+    <string name="bookmarks_count">%1$d bookmarks</string>
+    <string name="folder_count">%1$d folders</string>
     <string name="pause_task">Paused %1$s tasks</string>
     <string name="start_task">Started %1$s tasks</string>
     <string name="wait">Waiting</string>

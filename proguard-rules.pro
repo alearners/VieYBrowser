@@ -4,15 +4,23 @@
 }
 -keep class kawaii.viey.browser.WebJs { *; }
 -keep class kawaii.viey.browser.WebViey { *; }
-# BouncyCastle 反射/JCE provider
--keep class org.bouncycastle.** { *; }
+
+# BouncyCastle：只保留用到的 provider 与 ASN1/PKIX 入口，其余交给 R8 收缩
+-keep class org.bouncycastle.jce.provider.BouncyCastleProvider { *; }
+-keep class org.bouncycastle.jcajce.provider.** { *; }
+-keep class org.bouncycastle.cert.** { *; }
+-keep class org.bouncycastle.operator.** { *; }
+-keep class org.bouncycastle.openssl.** { *; }
+-keep class org.bouncycastle.asn1.** { *; }
 -dontwarn org.bouncycastle.**
-# org.json / jsoup 反射较少，保留入口
--keep class org.json.** { *; }
--keep class org.jsoup.** { *; }
--dontwarn org.jsoup.**
-# 新增协议库
+-dontwarn javax.naming.**
+-dontwarn org.slf4j.**
+
+# Paho MQTT / commons-net FTP 内部使用反射与包名约定
 -keep class org.eclipse.paho.** { *; }
 -dontwarn org.eclipse.paho.**
--keep class org.apache.commons.net.** { *; }
 -dontwarn org.apache.commons.net.**
+
+-allowaccessmodification
+-repackageclasses ''
+-optimizationpasses 5

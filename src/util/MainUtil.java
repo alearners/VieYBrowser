@@ -96,7 +96,7 @@ public class MainUtil {
 		
 		mPageSearchPopup.setOutsideTouchable(false);
 		
-		mPageSearchPopup.setTouchModal(false);
+		if (android.os.Build.VERSION.SDK_INT >= 29) mPageSearchPopup.setTouchModal(false);
 		
 		mPageSearchPopup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
 		mPageSearchPopup.setAnimationStyle(R.style.LeftSlideAnim);
@@ -339,17 +339,7 @@ public class MainUtil {
 		out.start();
 	}
 	
-	private static void restoreHorizontal(final ProgressBar bar,final long switchDuration,final Drawable originalProgressDrawable,final Drawable originalIndeterminateDrawable,final int originalWidth) {
-		bar.setIndeterminate(false);
-		if (originalProgressDrawable != null) {
-			bar.setProgressDrawable(originalProgressDrawable);
-		}
-		if (originalIndeterminateDrawable != null) {
-			bar.setIndeterminateDrawable(originalIndeterminateDrawable);
-		}
-		setSize(bar, originalWidth, i.dp2px(3));
-	}
-	
+		
 	private static void setSize(ProgressBar view, int width, int height) {
 		ViewGroup.LayoutParams lp = view.getLayoutParams();
 		if (lp != null) {
@@ -360,14 +350,4 @@ public class MainUtil {
 		view.setProgress(100);
 	}
 	
-	private static Drawable getSystemCircleIndeterminateDrawable(Context ctx) {
-		TypedArray ta = ctx.obtainStyledAttributes(
-		null,
-		new int[]{android.R.attr.indeterminateDrawable},
-		android.R.attr.progressBarStyleLarge,
-		0);
-		Drawable d = ta.getDrawable(0);
-		ta.recycle();
-		return d;
 	}
-}

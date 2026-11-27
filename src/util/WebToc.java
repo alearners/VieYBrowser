@@ -117,7 +117,7 @@ public final class WebToc {
 		
 		popup.setFocusable(true);
 		popup.setOutsideTouchable(false);
-		popup.setTouchModal(false);
+		if (android.os.Build.VERSION.SDK_INT >= 29) popup.setTouchModal(false);
 		popup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
 		popup.setOnDismissListener(() -> sPopup = null);
 		

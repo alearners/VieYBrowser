@@ -73,12 +73,7 @@ public class WebViey extends WebView {
 		return mJsBridge;
 	}
 	
-	private List<android.content.pm.ResolveInfo> getAppsForUri(Uri uri) {
-		android.content.Intent intent = new android.content.Intent(
-		android.content.Intent.ACTION_VIEW, uri);
-		return getContext().getPackageManager().queryIntentActivities(intent, 0);
-	}
-	
+		
 	public WebViey(Context context) {
 		this(context, null);
 	}
@@ -119,10 +114,7 @@ public class WebViey extends WebView {
 		certType = type == null ? "default" : type;
 	}
 	
-	private boolean isDark(){
-		return VieYApp.isDarkMode(getContext());
-	}
-	
+		
 	private boolean isImageMode(){
 		return "true".equals(VieYApp.getPrefs(getContext()).getString("image_mode", "false"));
 	}
@@ -445,6 +437,7 @@ public class WebViey extends WebView {
 				}
 			}
 			
+			@android.annotation.TargetApi(android.os.Build.VERSION_CODES.O)
 			@Override
 			public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
 				i.utw("Crash",
@@ -458,7 +451,9 @@ public class WebViey extends WebView {
 					@Override public void onListClick(String nr,int num){}
 					@Override public void onSelect(String content){}
 				});
-				return false;
+				// 返回 true 阻止系统直接杀掉进程，再尝试重建渲染进程
+				try { view.post(() -> view.reload()); } catch (Throwable ignored) {}
+				return true;
 			}
 			
 			@Override

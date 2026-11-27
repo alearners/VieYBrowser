@@ -4,9 +4,9 @@ import android.content.Context;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.util.TypedValue;
-import android.widget.EditText;
+import androidx.appcompat.widget.AppCompatEditText;
 
-public class EditViey extends EditText {
+public class EditViey extends AppCompatEditText {
 
     public EditViey(Context context) {
         this(context, null);

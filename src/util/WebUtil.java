@@ -15,6 +15,7 @@ import javax.net.ssl.SSLSocket;
 import android.net.http.SslCertificate;
 import java.security.NoSuchAlgorithmException;
 import android.text.TextUtils;
+import android.util.Log;
 import kawaii.viey.browser.*;
 import java.net.InetAddress;
 import android.view.ViewGroup;
@@ -401,7 +402,7 @@ public class WebUtil {
 			urlEdit.setHeight(i.dp2px(56));
 			urlEdit.setHint(R.string.file_link);
 			urlEdit.setText(url);
-			urlEdit.setSelection(url.length());
+			urlEdit.setSelection(0);
 			container.addView(urlEdit, new LinearLayout.LayoutParams(
 			LinearLayout.LayoutParams.MATCH_PARENT,
 			LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -416,6 +417,7 @@ public class WebUtil {
 		LinearLayout.LayoutParams.MATCH_PARENT,
 		LinearLayout.LayoutParams.WRAP_CONTENT));
 		
+		android.util.Log.d("VieYDl", "dialog url=" + url + " name=" + fileName);
 		i.utw(R.string.download_file, container,
 		R.string.cancel, R.string.start_download,
 		new mk.jk() {
@@ -436,17 +438,29 @@ public class WebUtil {
 					if (!u.isEmpty()) finalUrl = u;
 				}
 				
-				String downloadDirPath = VieYApp.getDownloadPath(m);
-				File downloadDir = new File(downloadDirPath);
-				if (!downloadDir.exists()) downloadDir.mkdirs();
-				
-				String headersJson = buildDownloadHeaders(userAgent, refererUrl, finalUrl);
-				DownloadManager.getInstance().startDownload(
-				m, finalUrl, name,
-				downloadDir.getAbsolutePath(),
-				headersJson,
-				VieYApp.getDownloadDefaultThreads(m));
-				i.twi(R.string.download_task_start);
+				try {
+					String downloadDirPath = VieYApp.getDownloadPath(m);
+					File downloadDir = new File(downloadDirPath);
+					if (!downloadDir.exists()) downloadDir.mkdirs();
+					if (!downloadDir.isDirectory() || !downloadDir.canWrite()) {
+						File ext = m.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS);
+						if (ext == null) ext = new File(m.getFilesDir(), "downloads");
+						ext.mkdirs();
+						downloadDir = ext;
+					}
+					Log.d("VieYDl", "start url=" + finalUrl + " name=" + name + " dir=" + downloadDir.getAbsolutePath());
+					String headersJson = buildDownloadHeaders(userAgent, refererUrl, finalUrl);
+					DownloadTask task = DownloadManager.getInstance().startDownload(
+					m, finalUrl, name,
+					downloadDir.getAbsolutePath(),
+					headersJson,
+					VieYApp.getDownloadDefaultThreads(m));
+					Log.d("VieYDl", "task=" + (task == null ? "null" : task.id + " " + task.savePath));
+					i.twi(R.string.download_task_start);
+				} catch (Throwable t) {
+					Log.e("VieYDl", "start failed", t);
+					i.tw("下载失败：" + t);
+				}
 			}
 			
 			@Override

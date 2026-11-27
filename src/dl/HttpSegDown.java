@@ -153,6 +153,13 @@ public class HttpSegDown {
         }, "httpseg-" + name).start();
     }
 
+    private static long lenOf(java.net.URLConnection c) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 24) return c.getContentLengthLong();
+        } catch (Throwable ignored) {}
+        return c.getContentLength();
+    }
+
     /** 探测大小：GET Range 0-1 读 Content-Range 总长（唯一可信来源），HEAD 长度仅作 >=4KB 的兜底 */
     private long probeSize() throws IOException {
         String last = "";
@@ -187,7 +194,7 @@ public class HttpSegDown {
                 c.setReadTimeout(8000);
                 c.setInstanceFollowRedirects(true);
                 c.setRequestProperty("User-Agent", UA);
-                long len = c.getContentLengthLong();
+                long len = lenOf(c);
                 c.disconnect();
                 if (len >= 4096) return len;
             } catch (Exception e) {

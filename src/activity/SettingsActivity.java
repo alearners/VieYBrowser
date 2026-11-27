@@ -201,7 +201,7 @@ public class SettingsActivity extends BaseActivity {
 	}
 
 	private void toggleFloatWindow() {
-		if (!android.provider.Settings.canDrawOverlays(this)) {
+		if (android.os.Build.VERSION.SDK_INT >= 23 && !android.provider.Settings.canDrawOverlays(this)) {
 			new android.app.AlertDialog.Builder(this).setTitle("需要悬浮窗权限")
 					.setMessage("请在系统设置里允许“显示在其他应用上层”，开启后回到浏览器，从菜单再次点悬浮窗即可。")
 					.setPositiveButton("去授权", (d, w) -> {

@@ -72,8 +72,8 @@
     <string name="redownloading">已开始重新下载</string>
     <string name="no_dwontask">没有对应的下载任务</string>
     <string name="diy">自定义</string>
-    <string name="bookmarks_count">%1$s 个书签</string>
-    <string name="folder_count">%1$s 个文件夹</string>
+    <string name="bookmarks_count">%1$d 个书签</string>
+    <string name="folder_count">%1$d 个文件夹</string>
     <string name="pause_task">已暂停 %1$s 个任务</string>
     <string name="start_task">已开始 %1$s 个任务</string>
     <string name="wait">等待</string>

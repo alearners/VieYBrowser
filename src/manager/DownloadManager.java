@@ -1040,7 +1040,7 @@ public class DownloadManager {
 					}
 				} else if (code == 200) {
 					task.supportRange = false;
-					long len = conn.getContentLengthLong();
+					long len = lenOf(conn);
 					if (len > 0) {
 						task.totalSize = len;
 						task.sizeUnknown = false;
@@ -1254,5 +1254,12 @@ public class DownloadManager {
 				postNotification(copy, stateChanged);
 			}
 		}
+	}
+
+	static long lenOf(java.net.URLConnection c) {
+		try {
+			if (android.os.Build.VERSION.SDK_INT >= 24) return c.getContentLengthLong();
+		} catch (Throwable ignored) {}
+		return c.getContentLength();
 	}
 }
