@@ -487,6 +487,8 @@ public class WebViey extends WebView {
 					FontInject.inject(view, url);
 					VieAsset.inject(view, url, "viey-bridge.js");
 					if (isImageMode()) VieAsset.inject(view, url, "vie-image.js");
+					String pluginJs = PluginStore.buildInjection(getContext(), url);
+					if (pluginJs.length() > 0) view.evaluateJavascript(pluginJs, null);
 				}
 				murl = null;
 				super.onPageFinished(view, url);

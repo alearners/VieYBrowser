@@ -20,6 +20,9 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <uses-feature
         android:name="android.hardware.camera"
@@ -179,6 +182,21 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_provider" />
         </provider>
+        <activity
+            android:name=".PluginActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false" />
+        <activity
+            android:name=".LinkDownloadActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false" />
+        <service
+            android:name=".FloatService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="悬浮窗浏览浮层" />
+        </service>
         <service
             android:name=".tab"
             android:exported="true">

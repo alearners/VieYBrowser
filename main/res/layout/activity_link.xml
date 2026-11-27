@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="40dp" android:orientation="horizontal">
+        <ImageView android:id="@+id/back_tool" android:layout_width="40dp" android:layout_height="40dp"
+            android:padding="8dp" android:src="@drawable/ic_arrow_back" />
+        <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:gravity="center_vertical" android:paddingStart="8dp"
+            android:text="ed2k / 多源下载" android:textColor="@color/text_primary" android:textSize="15sp" />
+    </LinearLayout>
+
+    <EditText android:id="@+id/link_input" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:hint="粘贴 ed2k://|file|名称|大小|hash|/ 链接" android:textSize="11sp" android:minLines="2"
+        android:gravity="top" />
+
+    <EditText android:id="@+id/link_server" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:hint="eD2k 服务器 host:port（取源用，可留空）" android:textSize="11sp" />
+
+    <EditText android:id="@+id/link_mirrors" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:hint="HTTP/HTTPS 镜像，每行一个（多源分段下载）" android:textSize="11sp" android:minLines="3"
+        android:gravity="top" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+        <Button android:id="@+id/link_parse" android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="解析" android:textSize="12sp" />
+        <Button android:id="@+id/link_sources" android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="服务器取源" android:textSize="12sp" />
+        <Button android:id="@+id/link_start" android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="开始下载" android:textSize="12sp" />
+    </LinearLayout>
+
+    <ProgressBar android:id="@+id/link_progress" style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent" android:layout_height="8dp" android:max="100" android:progress="0" />
+
+    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
+        <TextView android:id="@+id/link_status" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:padding="12dp" android:textIsSelectable="true" android:textSize="11sp"
+            android:textColor="@color/text_secondary" android:text="等待操作" />
+    </ScrollView>
+</LinearLayout>
