@@ -50,6 +50,26 @@ public class Ed2kHash {
         return hex(md4(digests.toByteArray()));
     }
 
+    /** 单个 ed2k part（CHUNK）的 MD4，用于分块校验 */
+    public static String hashChunk(File f, int chunkIndex) throws Exception {
+        long len = f.length();
+        long from = (long) chunkIndex * CHUNK;
+        if (from >= len) return "";
+        int want = (int) Math.min(CHUNK, len - from);
+        byte[] buf = new byte[want];
+        try (RandomAccessFile raf = new RandomAccessFile(f, "r")) {
+            raf.seek(from);
+            int got = 0;
+            while (got < want) {
+                int n = raf.read(buf, got, want - got);
+                if (n <= 0) break;
+                got += n;
+            }
+            if (got != want) return "";
+        }
+        return hex(md4(buf));
+    }
+
     public static String hex(byte[] b) {
         StringBuilder sb = new StringBuilder(b.length * 2);
         for (byte v : b) sb.append(String.format("%02x", v & 0xff));

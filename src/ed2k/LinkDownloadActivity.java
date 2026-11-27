@@ -3,6 +3,8 @@ package kawaii.viey.browser;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.widget.EditText;
 import android.widget.ProgressBar;
@@ -44,6 +46,11 @@ public class LinkDownloadActivity extends BaseActivity {
         String extra = getIntent().getStringExtra(EXTRA_LINK);
         if (!TextUtils.isEmpty(extra)) input.setText(extra);
 
+        findViewById(R.id.link_p2p).setOnClickListener(v -> doP2p());
+        findViewById(R.id.link_p2p_stop).setOnClickListener(v -> {
+            Ed2kService.stop(this);
+            append("已停止 P2P 下载服务");
+        });
         findViewById(R.id.link_parse).setOnClickListener(v -> doParse());
         findViewById(R.id.link_sources).setOnClickListener(v -> doSources());
         findViewById(R.id.link_start).setOnClickListener(v -> doStart());
@@ -116,6 +123,42 @@ public class LinkDownloadActivity extends BaseActivity {
                 }
             });
         }).start();
+    }
+
+    private void doP2p() {
+        if (link == null) doParse();
+        if (link == null || TextUtils.isEmpty(link.hash) || link.size <= 0) {
+            Toast.makeText(this, "需要完整 ed2k 链接（名称 + 大小 + hash）", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String hostPort = server.getText().toString().trim();
+        if (hostPort.contains(":")) {
+            link.serverHost = hostPort.substring(0, hostPort.lastIndexOf(':'));
+            try {
+                link.serverPort = Integer.parseInt(hostPort.substring(hostPort.lastIndexOf(':') + 1));
+            } catch (Exception ignored) {
+            }
+        }
+        for (String line : mirrors.getText().toString().split("\n")) {
+            String hp = line.trim();
+            if (hp.length() > 0 && !hp.startsWith("http")) {
+                hp = hp.replace("ed2k://", "");
+                if (hp.contains(":")) link.sources.add(hp);
+            }
+        }
+        Ed2kService.start(this, link);
+        append("P2P 已启动：源 " + link.sources.size() + " + 服务器 " + link.serverHost);
+        pollP2p();
+    }
+
+    private final Handler poller = new Handler(Looper.getMainLooper());
+
+    private void pollP2p() {
+        Ed2kDownload d = Ed2kService.current();
+        if (d == null) return;
+        status.setText("P2P：" + Ed2kService.lastState() + "\n源 " + d.sourceCount() + " · 对端 " + d.peerCount()
+                + " · " + (d.speedBps() / 1024) + " KB/s · " + d.doneBytes() + " 字节");
+        poller.postDelayed(this::pollP2p, 1200);
     }
 
     private void doStart() {
