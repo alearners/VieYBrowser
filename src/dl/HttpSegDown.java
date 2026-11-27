@@ -102,6 +102,10 @@ public class HttpSegDown {
         paused = true;
     }
 
+    public long totalSize() {
+        return size;
+    }
+
     public File dir() {
         File d = ctx.getExternalFilesDir("download");
         if (d == null) d = new File(ctx.getFilesDir(), "download");
