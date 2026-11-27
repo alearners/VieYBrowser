@@ -444,8 +444,19 @@ public class WebViey extends WebView {
 			}
 			
 			@Override
+			public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view, android.webkit.WebResourceRequest request) {
+				try {
+					android.webkit.WebResourceResponse r = FontInject.intercept(getContext(), request);
+					if (r != null) return r;
+				} catch (Exception ignored) {
+				}
+				return super.shouldInterceptRequest(view, request);
+			}
+			
+			@Override
 			public void onPageFinished(WebView view, String url) {
 				injectJs();
+				if (!i.canRun(url)) FontInject.inject(view, url);
 				murl = null;
 				super.onPageFinished(view, url);
 				url = urrl(url);
