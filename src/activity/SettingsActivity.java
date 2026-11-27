@@ -129,6 +129,9 @@ public class SettingsActivity extends BaseActivity {
 		addItem("用户脚本插件（.user.js 管理 / 脚本市场）", v -> startActivity(new Intent(this, PluginActivity.class)));
 		addItem("脚本市场地址", v -> showPluginMarketDialog());
 		addItem("多源 / 多进程下载（:dl 独立进程）", v -> startActivity(new Intent(this, DlActivity.class)));
+		addItem("BT 下载（magnet / .torrent + piece 校验）", v -> startActivity(new Intent(this, BtActivity.class)));
+		addItem("BT 自检（bencode / magnet / piece）", v -> runBtSelfTest());
+		addItem("BT 连接数（peer 上限）", v -> showBtPeersDialog());
 		addItem("悬浮窗浏览（Service + WebView 浮层）", v -> toggleFloatWindow());
 		addItem("uTP 自检（头部 / 停等传输）", v -> runUtpSelfTest());
 		addItem("下载连接数（每任务上限）", v -> showDlConnsDialog());
@@ -742,5 +745,46 @@ public class SettingsActivity extends BaseActivity {
 						.setPositiveButton("关闭", null).show();
 			});
 		}, "ed2k-selftest").start();
+	}
+
+	private void showBtPeersDialog() {
+		android.widget.EditText et = new android.widget.EditText(this);
+		et.setText(String.valueOf(getPrefs(this).getInt("bt_peers", 4)));
+		et.setHint("1-8");
+		new android.app.AlertDialog.Builder(this).setTitle("BT 同时连接 peer 上限")
+				.setView(et)
+				.setPositiveButton("保存", (d, w) -> {
+					try {
+						int n = Integer.parseInt(et.getText().toString().trim());
+						getPrefs(this).edit().putInt("bt_peers", Math.max(1, Math.min(8, n))).apply();
+						Toast.makeText(this, "已保存，新任务生效", Toast.LENGTH_SHORT).show();
+					} catch (Exception e) {
+						Toast.makeText(this, "请输入 1-8", Toast.LENGTH_SHORT).show();
+					}
+				})
+				.setNegativeButton("取消", null).show();
+	}
+
+	private void runBtSelfTest() {
+		final android.app.ProgressDialog pd = new android.app.ProgressDialog(this);
+		pd.setMessage("BT 自检（离线，约 1 秒）…");
+		pd.setCancelable(false);
+		pd.show();
+		new Thread(() -> {
+			String r;
+			try {
+				r = BtSelfTest.run();
+			} catch (Throwable t) {
+				r = "FAIL " + t;
+			}
+			final String fr = r;
+			runOnUiThread(() -> {
+				pd.dismiss();
+				new android.app.AlertDialog.Builder(this)
+						.setTitle("BT 自检")
+						.setMessage(fr)
+						.setPositiveButton("关闭", null).show();
+			});
+		}, "bt-selftest").start();
 	}
 }

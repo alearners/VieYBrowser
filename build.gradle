@@ -10,8 +10,8 @@ android {
         applicationId "kawaii.viey.browser"
         minSdk 21
         targetSdk 34
-        versionCode 202611286
-        versionName "0.8.6-dev"
+        versionCode 202611290
+        versionName "0.9.0-dev"
     }
 
     sourceSets {
@@ -28,12 +28,23 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
 
+    signingConfigs {
+        release {
+            storeFile file('keystore/viey-release.jks')
+            storePassword System.getenv('VIEY_STORE_PASS') ?: 'viey-release'
+            keyAlias System.getenv('VIEY_KEY_ALIAS') ?: 'viey'
+            keyPassword System.getenv('VIEY_KEY_PASS') ?: 'viey-release'
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
         }
         debug {
             minifyEnabled false

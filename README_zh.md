@@ -71,6 +71,9 @@ export ANDROID_HOME=/path/to/android-sdk
 | 全局字体 | 网页字体注入（同源 `font.ttf` + 二进制 FontFace） | `src/util/FontInject.java` |
 
 **未移植（说明）**：
+- BT 下载（0.9.0-dev，`src/bt/`）：`.torrent`（BEP-3 单/多文件）与 `magnet:`（BEP-9）双入口；HTTP(S) tracker announce + compact peers；TCP PeerWire 握手 + 分块请求 + **逐片 SHA-1 校验**（与 `pieces` 原文比对，坏片丢回队列重下，完成后整盘复核）
+- BT 补充：BEP-19 HTTP 种子（`url-list` / `httpseeds`，tracker 无 peer 时按 Range 取片，同样逐片校验）；`.bt.state` 逐片续传；`magnet:` / `.torrent` 已注册 `ACTION_VIEW` 深链，点链接直接进下载页并自动开始
+- BT 诚实边界：不做做种/上传、不做 DHT/PEX、仅 HTTP(S) tracker（无 UDP tracker）、HTTP 种子暂只支持单文件种子；无 DHT 时冷门种子可能取不到 peer
 - `ed2k` / jmule 引擎：**已按用户要求废弃**（不做完整 eMule 内核）。改为「uTP / HTTP 多源多进程下载」：`src/dl/{HttpSegDown,DlService,DlStore,DlActivity}.java` 做多镜像 Range 分段 + `:dl` 独立进程 + 断点续传，`src/net/{UtpProto,UtpStream,UtpSelfTest}.java` 做 BEP-29 头与停等传输骨架；`ed2k://` 仅作为元数据解析文件名/大小。
 - 桌面小部件（awzxWidget）、快捷磁贴（awzxTile）、壁纸服务：偏系统集成，与浏览器核心无关。
 - 存储配额面板、鼠标键盘事件注入：6.5.0 的宿主引擎机制（iApp/Lua 运行时）绑定较深，需按其脚本协议重做，暂列后续。
