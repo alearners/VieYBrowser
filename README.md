@@ -30,15 +30,16 @@ The installation package is approximately 10 MB in size.
 - Supports external applications accessing internal files via local storage
 - Minimum support for Android 5
 
-### VieY 自研扩展（0.7.1-dev）
+### VieY 自研扩展（0.8.6-dev）
 
 - 订阅：RSS/Atom 源管理，兼容阅读 App(Legado) `rssSources.json` 字段，支持导入/导出 `backup.zip` 订阅备份
 - CSP 安全网页字体：`shouldInterceptRequest` 返回同源 `/__vie__/font.ttf` + `font.js`，CSP 白名单内加载，规避 `zhihu.com/appview/special` 这类拦截
 - 用户脚本插件：`.user.js` 导入（粘贴 / URL）、`@match`/`@include` 匹配、启停、脚本市场地址可配
-- ed2k 内核（`Ed2kProto` / `PeerClient` / `Ed2kDownload` / `Ed2kUploader`）：`ed2k://` 解析、服务器登录 + 取源、对端握手、FILEREQUEST/SLOT/REQUEST_PARTS/SENDING_PART、180KB 块调度、9.72MB chunk MD4 校验、`.part` 续传、上传队列 + 共享目录、入站混淆握手（RC4/MD5，eMule 规范）
-- 多源下载：HTTP 镜像分段并发 + 断点续传 + ed2k hash 校验（与 P2P 并行保留）
-- eD2k 自检（后台线程，不阻塞 UI）：MD4 向量 / RC4 对称 / 包编解码 / chunk hash 一致性 / **环回 P2P 传输**（本机上传服务 + `PeerClient` 跑完整 HELLO→FILEREQ→SLOT→REQPARTS→SENDING_PART 状态机，校验收到数据 MD4）
-- 真机实测（OnePlus 8T / KB2000 / Android 11）：6 项自检全部 PASS，环回 P2P 64KB 约 17ms 完成
+- 多源多进程下载（替代 eD2k 内核，不引入完整 eMule）：HTTP(S) Range 分段、每任务多连接（默认 8，可配 1–16）、多镜像自动换源、动态对半分片（剩余 >4MB 且未达连接上限）、`.part` + `.part.state` 逐段续传、可选 SHA-256 校验后改名
+- 下载独立进程：`DlService` 声明 `android:process=":dl"` + `foregroundServiceType="dataSync"`，前台通知进度，主进程与下载进程仅通过 `filesDir/dl_task.json`（tmp→rename 原子写）通信，UI 卡死/回收不影响下载
+- 容错：尺寸探测只认 `206 + Content-Range`（HEAD 仅作 ≥4KB 兜底）；403/408/429/5xx 判定为限流→指数退避重试；每段 8 次、全部段耗尽的整体重试 20 轮；`Content-Range` 总长与探测不一致、分段总长不等于文件长度、改名前后长度不符都会显式中止，杜绝「报 done 却只有 1 字节」
+- uTP 传输层骨架（`UtpProto` / `UtpStream`）：BEP-29 20 字节头、SYN→STATE 建链、按 MTU 切片停等 ACK + 指数退避重传、FIN/RESET；诚实标注：无 LEDBAT 拥塞控制 / SACK / RTT 平滑，未接 BitTorrent peer 状态机（uTP 属 BT，不属于 eD2k）
+- uTP 自检（后台线程 + ProgressDialog）：头部 pack/parse 往返、`127.0.0.1` 环回 8KB 逐字节比对
 - 悬浮窗浏览：`FloatService`（Service + WebView 浮层，可拖动标题栏，复用字体/资源拦截链）
 - 运行日志、安全浏览拦截、看图模式、MQTT / FTP 协议工具
 
@@ -83,10 +84,8 @@ The installation package is approximately 10 MB in size.
 - Support data: blob: file downloads
 - Modular parsing of text/gemini, text/scroll, and other file types
 - Support download functionality for various smolnet protocols
-- （VieY）AICH 恢复：已做 chunk 失败标脏重下与 AICH 应答解析，AICH 哈希树自愈（按 180KB 块恢复）未完成
-- （VieY）Kad：节点表 / 源缓存 / bootstrap 发包已做，Kademlia2 桶路由、关键字发布与搜索未完成（默认关闭）
-- （VieY）uTP：eMule/eD2k 协议本身没有 uTP（uTP/BEP-29 属于 BitTorrent），这里不做；多源仍是 HTTP/TCP
-- （VieY）混淆握手：出站需知道对端 user hash（源列表常缺），缺失时自动降级明文；入站混淆已实现
+- （VieY）uTP：BEP-29 头/停等传输已做，LEDBAT 拥塞控制、SACK、RTT 平滑与 BitTorrent peer/piece 状态机未做；eMule/eD2k 协议本身没有 uTP
+- （VieY）eD2k：已整体移除（不做完整 eMule 内核），`ed2k://` 仅解析文件名/大小当元数据，字节走 HTTP 多源
 - （VieY）插件 `@match` 支持 `*` 通配，尚不支持 `@grant`/`GM_*` 完整语义（可用 `viek.http` 走 Java 代理）
 
 ---
