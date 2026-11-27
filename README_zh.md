@@ -25,6 +25,8 @@ VieY 是本人 Vie 项目的一个分支，去除了多余功能，保留并且�
 - 订阅源管理：新增、删除、复制链接，支持 RSS 2.0 / RSS 1.0(RDF) / Atom
 - 兼容「阅读(Legado)」订阅源规则：`ruleArticles / ruleTitle / ruleLink / rulePubDate / ruleDescription / ruleImage`，栏目规则式 HTML 列表也能解析
 - 备份恢复：直接读取「阅读」的 `backup.zip` 内 `rssSources.json`，按订阅地址去重合并导入；导出为同结构的 `VieY-rss-backup.zip`，可直接在「阅读」里恢复
+- 订阅源规则编辑器（0.11.0-dev）：长按订阅源 →「编辑规则」，可逐字段改 `ruleArticles / ruleTitle / ruleLink / rulePubDate / ruleDescription / ruleImage / ruleContent / ruleNextPage`，`ruleContent` 支持 `@css:` / `@@css:` 选择器与 `@js:` 页面脚本（`@js:` 在阅读页的 WebView 里执行，返回字符串/元素/元素集合，结果走同一套排版）；「测试」按钮抓一次即可看到前 5 条标题与正文预览
+- 定时后台刷新 + 未读角标（0.11.0-dev）：`FeedRefreshJob`（JobScheduler，`setPersisted` 开机续跑）；条目缓存落 `filesDir/rss/items/<sha1>.json`，未读数直接由缓存与已读集合算出，不必联网；订阅列表显示「订阅 (n) · 未读 N」，条目列表显示「未读 N · 时间」
 - 入口：设置 → 订阅
 
 **网页自定义字体（CSP 安全）**

@@ -27,10 +27,17 @@ public class FeedActivity extends BaseActivity {
 
     private static final int REQ_IMPORT = 4001;
     private static final int REQ_EXPORT = 4002;
+    private static final int REQ_EDIT = 4003;
 
     private final List<FeedSource> data = new ArrayList<>();
     private BaseAdapter adapter;
     private ListView list;
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (list != null) reload();
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,7 +46,8 @@ public class FeedActivity extends BaseActivity {
 
         list = findViewById(R.id.feed_list);
         findViewById(R.id.back_tool).setOnClickListener(v -> finish());
-        findViewById(R.id.feed_add).setOnClickListener(v -> showAddDialog());
+        findViewById(R.id.feed_add).setOnClickListener(v ->
+                startActivityForResult(FeedEditActivity.intent(this, new FeedSource(), true), REQ_EDIT));
         findViewById(R.id.feed_import).setOnClickListener(v -> pickImport());
         findViewById(R.id.feed_export).setOnClickListener(v -> pickExport());
         findViewById(R.id.feed_all).setOnClickListener(v -> {
@@ -74,7 +82,14 @@ public class FeedActivity extends BaseActivity {
                 View v = convertView != null ? convertView : getLayoutInflater().inflate(R.layout.item_feed, parent, false);
                 FeedSource s = data.get(position);
                 ((TextView) v.findViewById(R.id.item_title)).setText(s.displayTitle());
-                ((TextView) v.findViewById(R.id.item_sub)).setText(s.displaySubtitle());
+                int unread = FeedRepo.unreadCount(FeedActivity.this, s);
+                String sub = s.displaySubtitle();
+                if (unread > 0) sub = "未读 " + unread + " · " + sub;
+                else {
+                    long t = FeedRepo.cachedTime(FeedActivity.this, s);
+                    if (t > 0) sub = "已读 · " + sub;
+                }
+                ((TextView) v.findViewById(R.id.item_sub)).setText(sub);
                 return v;
             }
         };
@@ -91,8 +106,12 @@ public class FeedActivity extends BaseActivity {
             FeedSource s = data.get(position);
             new AlertDialog.Builder(this)
                     .setTitle(s.displayTitle())
-                    .setItems(new String[]{"删除订阅源", "复制链接"}, (d, which) -> {
+                    .setItems(new String[]{"编辑规则", "立即刷新", "删除订阅源", "复制链接"}, (d, which) -> {
                         if (which == 0) {
+                            startActivityForResult(FeedEditActivity.intent(this, s, false), REQ_EDIT);
+                        } else if (which == 1) {
+                            refreshOne(s);
+                        } else if (which == 2) {
                             FeedStore.remove(this, s.url);
                             reload();
                         } else {
@@ -108,12 +127,31 @@ public class FeedActivity extends BaseActivity {
         reload();
     }
 
+    private void refreshOne(FeedSource s) {
+        Toast.makeText(this, "刷新 " + s.displayTitle() + "…", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            String msg;
+            try {
+                int n = FeedRepo.refresh(this, s);
+                msg = s.displayTitle() + " 抓取 " + n + " 条";
+            } catch (Exception e) {
+                msg = "刷新失败：" + e.getMessage();
+            }
+            final String fmsg = msg;
+            runOnUiThread(() -> {
+                Toast.makeText(this, fmsg, Toast.LENGTH_SHORT).show();
+                reload();
+            });
+        }, "feed-refresh-one").start();
+    }
+
     private void reload() {
         data.clear();
         data.addAll(FeedStore.load(this));
         adapter.notifyDataSetChanged();
         TextView t = findViewById(R.id.feed_title);
-        t.setText("订阅 (" + data.size() + ")");
+        int unread = FeedRepo.totalUnread(this);
+        t.setText(unread > 0 ? "订阅 (" + data.size() + ") · 未读 " + unread : "订阅 (" + data.size() + ")");
     }
 
     private void showAddDialog() {
@@ -175,6 +213,10 @@ public class FeedActivity extends BaseActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode == RESULT_OK && data == null && requestCode == REQ_EDIT) {
+            reload();
+            return;
+        }
         if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData();
         if (requestCode == REQ_IMPORT) {

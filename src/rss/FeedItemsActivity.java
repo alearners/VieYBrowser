@@ -47,6 +47,15 @@ public class FeedItemsActivity extends BaseActivity {
     private final Handler ui = new Handler(Looper.getMainLooper());
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
+            empty.setVisibility(articles.isEmpty() ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_feed_items);
@@ -174,95 +183,53 @@ public class FeedItemsActivity extends BaseActivity {
             return;
         }
 
-        empty.setVisibility(View.VISIBLE);
-        empty.setText("正在加载…");
+        // 先上缓存，秒开；再后台刷新
+        List<FeedParser.Article> cached = allMode ? FeedRepo.cachedAll(this) : FeedRepo.loadItems(this, src);
+        articles.clear();
+        articles.addAll(cached);
+        adapter.notifyDataSetChanged();
+        if (cached.isEmpty()) {
+            empty.setVisibility(View.VISIBLE);
+            empty.setText("正在加载…");
+        } else {
+            empty.setVisibility(View.GONE);
+        }
+
         new Thread(() -> {
             String err = null;
-            List<FeedParser.Article> parsed = new ArrayList<>();
+            List<FeedParser.Article> fresh = new ArrayList<>();
             try {
                 if (allMode) {
-                    parsed = loadAll();
-                    if (parsed.isEmpty()) err = "没有启用的订阅源，或全部抓取失败";
+                    FeedRepo.refreshAll(this);
+                    fresh = FeedRepo.cachedAll(this);
                 } else {
-                    String body = fetch(src.url, src);
-                    parsed = FeedParser.parse(body, src, src.url);
-                    for (FeedParser.Article a : parsed) a.source = src.displayTitle();
-                    if (parsed.isEmpty()) err = "未能解析出文章，请检查订阅地址或栏目规则";
+                    FeedRepo.refresh(this, src);
+                    fresh = FeedRepo.loadItems(this, src);
                 }
+                if (fresh.isEmpty()) err = allMode ? "没有启用的订阅源，或全部抓取失败"
+                        : "未能解析出文章，请到「订阅源管理」检查规则";
             } catch (Exception e) {
-                err = "加载失败：" + e.getMessage();
+                err = "刷新失败：" + e.getMessage();
             }
             final String ferr = err;
-            final List<FeedParser.Article> fres = parsed;
+            final List<FeedParser.Article> ffresh = fresh;
             ui.post(() -> {
-                articles.clear();
-                articles.addAll(fres);
-                adapter.notifyDataSetChanged();
-                if (fres.isEmpty()) {
-                    empty.setVisibility(View.VISIBLE);
-                    empty.setText(ferr == null ? "没有内容" : ferr);
-                } else {
-                    empty.setVisibility(View.GONE);
+                if (ffresh.isEmpty()) {
+                    if (articles.isEmpty()) {
+                        empty.setVisibility(View.VISIBLE);
+                        empty.setText(ferr == null ? "没有内容" : ferr + "\n（长按条目可编辑规则）");
+                    } else {
+                        Toast.makeText(this, ferr == null ? "刷新无新内容" : ferr, Toast.LENGTH_SHORT).show();
+                    }
+                    return;
                 }
+                articles.clear();
+                articles.addAll(ffresh);
+                adapter.notifyDataSetChanged();
+                empty.setVisibility(View.GONE);
+                if (!TextUtils.isEmpty(ferr)) Toast.makeText(this, ferr, Toast.LENGTH_SHORT).show();
             });
         }).start();
     }
 
-    /** 并发抓取所有启用的源，按 pubDate 倒序合并（归一化过的日期直接字符串比较） */
-    private List<FeedParser.Article> loadAll() {
-        List<FeedSource> sources = new ArrayList<>();
-        for (FeedSource s : FeedStore.load(this)) if (s.enabled) sources.add(s);
-        List<FeedParser.Article> out = new ArrayList<>();
-        if (sources.isEmpty()) return out;
-
-        int threads = Math.min(4, sources.size());
-        ExecutorService pool = Executors.newFixedThreadPool(threads);
-        List<Future<List<FeedParser.Article>>> futures = new ArrayList<>();
-        for (FeedSource s : sources) {
-            futures.add(pool.submit((Callable<List<FeedParser.Article>>) () -> {
-                try {
-                    String body = fetch(s.url, s);
-                    List<FeedParser.Article> list = FeedParser.parse(body, s, s.url);
-                    for (FeedParser.Article a : list) a.source = s.displayTitle();
-                    return list;
-                } catch (Exception e) {
-                    android.util.Log.w("viey-rss", s.displayTitle() + " 抓取失败：" + e.getMessage());
-                    return new ArrayList<FeedParser.Article>();
-                }
-            }));
-        }
-        for (Future<List<FeedParser.Article>> f : futures) {
-            try {
-                out.addAll(f.get());
-            } catch (Exception ignored) {
-            }
-        }
-        pool.shutdownNow();
-        Collections.sort(out, (a, b) -> {
-            String x = a.pubDate == null ? "" : a.pubDate;
-            String y = b.pubDate == null ? "" : b.pubDate;
-            return y.compareTo(x);
-        });
-        return out;
-    }
-
-    private String fetch(String url, FeedSource s) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(20000);
-        conn.setInstanceFollowRedirects(true);
-        String ua = WebSettings.getDefaultUserAgent(this);
-        conn.setRequestProperty("User-Agent", TextUtils.isEmpty(ua) ? "Mozilla/5.0 (Linux; Android) VieY" : ua);
-        conn.setRequestProperty("Accept", "application/rss+xml, application/xml, text/xml, text/html, */*");
-        if (s != null) FeedParser.applyHeader(conn, s.header);
-        int code = conn.getResponseCode();
-        if (code >= 400) throw new Exception("HTTP " + code);
-        try (InputStream in = conn.getInputStream()) {
-            ByteArrayOutputStream bo = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
-            return bo.toString("UTF-8");
-        }
-    }
 }

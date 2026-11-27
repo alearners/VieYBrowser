@@ -119,6 +119,29 @@ public class SettingsActivity extends BaseActivity {
 			it.putExtra(FeedItemsActivity.EXTRA_FAVS, true);
 			startActivity(it);
 		});
+		addSwitchItem("订阅定时后台刷新（JobScheduler）", FeedRefreshJob.isAuto(this),
+				(v, is) -> FeedRefreshJob.setAuto(this, is));
+		TextView textRssInterval = addValueItem("刷新间隔", v -> {
+			final int cur = FeedRefreshJob.interval(this);
+			final int[] mins = {15, 30, 60, 180, 360};
+			String[] labels = new String[mins.length];
+			for (int i = 0; i < mins.length; i++) labels[i] = mins[i] + " 分钟" + (mins[i] == cur ? "（当前）" : "");
+			new android.app.AlertDialog.Builder(this)
+					.setTitle("刷新间隔")
+					.setItems(labels, (d, w) -> {
+						FeedRefreshJob.setInterval(this, mins[w]);
+						Toast.makeText(this, "已设为 " + mins[w] + " 分钟", Toast.LENGTH_SHORT).show();
+					})
+					.show();
+		});
+		textRssInterval.setText(FeedRefreshJob.interval(this) + " 分钟");
+		addItem("立即刷新全部订阅源", v -> {
+			Toast.makeText(this, "后台刷新中…", Toast.LENGTH_SHORT).show();
+			new Thread(() -> {
+				int ok = FeedRepo.refreshAll(this);
+				runOnUiThread(() -> Toast.makeText(this, "刷新完成：" + ok + " 个源", Toast.LENGTH_SHORT).show());
+			}, "settings-feed-refresh").start();
+		});
 		addValueItem("正文离线缓存", v -> {
 			long kb = FeedState.cacheSize(this) / 1024;
 			new android.app.AlertDialog.Builder(this)

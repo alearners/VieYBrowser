@@ -10,6 +10,7 @@ import android.text.TextUtils;
 import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -110,6 +111,11 @@ public class FeedReaderActivity extends BaseActivity {
             render(null, "没有可读的链接");
             return;
         }
+        String rule = src == null || src.ruleContent == null ? "" : src.ruleContent.trim();
+        if (rule.startsWith("@js:")) {
+            loadByJs(rule.substring(4).trim());
+            return;
+        }
         titleView.setText(TextUtils.isEmpty(article.title) ? article.link : article.title);
         new Thread(() -> {
             String page = null;
@@ -142,6 +148,54 @@ public class FeedReaderActivity extends BaseActivity {
                 if (fromCache) Toast.makeText(this, "离线缓存", Toast.LENGTH_SHORT).show();
             });
         }, "feed-detail").start();
+    }
+
+    /** @js: 规则：在页面上下文执行，取返回值（字符串 / 元素 / 元素集合） */
+    private void loadByJs(String js) {
+        titleView.setText(TextUtils.isEmpty(article.title) ? article.link : article.title);
+        // @js: 规则需要在页面上下文执行，临时开启 JS；取到结果后立即关闭再渲染
+        web.getSettings().setJavaScriptEnabled(true);
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                // eval 语义对齐 Legado：多语句脚本返回最后一个表达式的值
+                String expr = "(function(){try{var r=eval(" + org.json.JSONObject.quote(js) + ");"
+                        + "if(r==null)return '';"
+                        + "if(typeof r==='string')return r;"
+                        + "if(r.innerHTML!==undefined)return r.innerHTML;"
+                        + "if(typeof r.length==='number'){var s='';for(var i=0;i<r.length;i++){var e=r[i];"
+                        + "s+=((e&&e.innerHTML!==undefined)?e.innerHTML:String(e));}return s;}"
+                        + "var t=(r.innerText!==undefined)?r.innerText:String(r);return t;"
+                        + "}catch(e){return 'ERRJS:'+e.message;}})()";
+                view.evaluateJavascript(expr, value -> {
+                    view.getSettings().setJavaScriptEnabled(false);
+                    String text;
+                    try {
+                        Object o = new org.json.JSONTokener(value).nextValue();
+                        text = o == null ? "" : String.valueOf(o);
+                    } catch (Exception e) {
+                        text = value;
+                    }
+                    if (value == null || "null".equals(value)) {
+                        render(null, "JS 规则返回空（检查规则是否能取到元素）");
+                        return;
+                    }
+                    if (text.startsWith("ERRJS:")) {
+                        render(null, "JS 规则执行失败：" + text.substring(6));
+                        return;
+                    }
+                    if (TextUtils.isEmpty(text)) {
+                        render(null, "JS 规则没有取到内容");
+                        return;
+                    }
+                    FeedState.writeCache(FeedReaderActivity.this, article.link, text);
+                    String html = ContentExtractor.wrap(text, null, article.link,
+                            VieYApp.isDarkMode(FeedReaderActivity.this), textZoom);
+                    web.loadDataWithBaseURL(article.link, html, "text/html", "UTF-8", null);
+                });
+            }
+        });
+        web.loadUrl(article.link);
     }
 
     private void render(String body, String msg) {
