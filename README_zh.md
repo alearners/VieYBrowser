@@ -16,7 +16,39 @@ VieY 是本人 Vie 项目的一个分支，去除了多余功能，保留并且�
 
 安装包体积约 10 MB
 
+
 ---
+
+## 2.1 新增功能（dev/feed-subscription 分支）
+
+**订阅 / RSS**
+- 订阅源管理：新增、删除、复制链接，支持 RSS 2.0 / RSS 1.0(RDF) / Atom
+- 兼容「阅读(Legado)」订阅源规则：`ruleArticles / ruleTitle / ruleLink / rulePubDate / ruleDescription / ruleImage`，栏目规则式 HTML 列表也能解析
+- 备份恢复：直接读取「阅读」的 `backup.zip` 内 `rssSources.json`，按订阅地址去重合并导入；导出为同结构的 `VieY-rss-backup.zip`，可直接在「阅读」里恢复
+- 入口：设置 → 订阅
+
+**网页自定义字体（CSP 安全）**
+- 带 CSP 的站点（如 `zhihu.com/appview/special`）会拦截内联 `@font-face` 和 `data:` 字体
+- 实现方式：在 `shouldInterceptRequest` 里用「页面同源 URL」返回字体与注入脚本
+  - `https://<当前页面 host>/__vie__/font.ttf` → 字体字节
+  - `https://<当前页面 host>/__vie__/font.js` → 注入脚本
+- 同源资源本身在 CSP 允许名单内，不需要放行 `data:` / `unsafe-eval`
+- 注入脚本用二进制 `FontFace` + `CSSStyleSheet.adoptedStyleSheets` 应用，优先网络加载 `<script src>`，被 `script-src` 拦截时退回 WebView 直接执行
+- 入口：设置 → 网页字体（开关 + 选择 `.ttf/.otf`）
+
+---
+
+## 2.2 构建
+
+需要 JDK 17 + Android SDK（compileSdk 34 / build-tools 34.0.0）。
+
+```bash
+export JAVA_HOME=/path/to/jdk-17
+export ANDROID_HOME=/path/to/android-sdk
+./gradlew assembleDebug
+```
+
+产物：`build/outputs/apk/debug/VieY-debug.apk`
 
 
 ## 2. 功能展示
