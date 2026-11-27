@@ -10,14 +10,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - name: Build release (debug-signed)
-        run: chmod +x gradlew && ./gradlew --no-daemon assembleRelease
+
+      # 只装真正需要的包：'tools' 已从 SDK 仓库下线，带上它会让 setup-android 直接 exit 1
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+          log-accepted-android-sdk-licenses: false
+
+      - name: Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'build.gradle') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Build release + debug
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon clean assembleRelease assembleDebug
+
+      - name: Verify signature (固定 keystore)
+        run: |
+          BT="$ANDROID_HOME/build-tools/34.0.0/apksigner"
+          for f in build/outputs/apk/release/*.apk; do
+            echo "== $f"
+            "$BT" verify --print-certs "$f" | grep -E 'certificate DN|SHA-256'
+            "$BT" verify -v "$f" | grep -E 'Verifies|v1 scheme|v2 scheme'
+          done
+
       - uses: actions/upload-artifact@v4
         with:
-          name: VieY-release-apk
-          path: build/outputs/apk/release/*.apk
+          name: VieY-apk
+          path: |
+            build/outputs/apk/release/*.apk
+            build/outputs/apk/debug/*.apk
