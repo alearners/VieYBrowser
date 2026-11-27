@@ -114,6 +114,16 @@ public class SettingsActivity extends BaseActivity {
 		textWebFont = addValueItem("网页字体文件 (.ttf/.otf)", v -> pickWebFont());
 		textWebFont.setText(FontInject.fontFile(this) == null ? "未选择" : FontInject.fontFile(this).getName());
 		
+		addSection("浏览增强");
+		addSwitchItem("安全浏览拦截（可疑域名提示页）", SafeBrowse.enabled(this), (v, is) -> SafeBrowse.setEnabled(this, is));
+		addSwitchItem("看图模式（点图放大）", "true".equals(getPrefs(this).getString("image_mode", "false")), (v, is) -> getPrefs(this).edit().putString("image_mode", is ? "true" : "false").apply());
+		addItem("运行日志 / 资源日志", v -> startActivity(new Intent(this, LogActivity.class)));
+		
+		addSection("协议工具");
+		addItem("MQTT 订阅（Paho mqttv3）", v -> startActivity(new Intent(this, MqttActivity.class)));
+		addItem("FTP 目录浏览 / 下载（commons-net）", v -> startActivity(new Intent(this, FtpActivity.class)));
+		addItem("Java 网络代理已启用（页面可用 viek.http）", v -> i.utw("网络代理", "页面脚本可调用 viek.http(url, opts) 经 Java 发起请求，绕同源限制；也可用 viek.fetch。"));
+		
 		textToolbarPosition = addValueItem(getString(R.string.toolbar_position), v -> showToolbarPosDialog());
 		textHomeMode = addValueItem(getString(R.string.home_mode), v -> showHomeModeDialog());
 		

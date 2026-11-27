@@ -108,6 +108,18 @@
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="false" />
         <activity
+            android:name=".MqttActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false" />
+        <activity
+            android:name=".FtpActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false" />
+        <activity
+            android:name=".LogActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false" />
+        <activity
             android:name=".HistoryActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="false" />

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:orientation="horizontal">
+        <ImageView
+            android:id="@+id/back_tool"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_arrow_back" />
+        <TextView
+            android:id="@+id/mqtt_title"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:text="MQTT 订阅（移植 Vie 6.5.0 mqttv3）"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp" />
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/mqtt_server"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="服务器 tcp://broker.example:1883"
+        android:textSize="12sp" />
+    <EditText
+        android:id="@+id/mqtt_topic"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="订阅主题，如 test/#"
+        android:textSize="12sp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/mqtt_connect"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="连接并订阅"
+            android:textSize="12sp" />
+        <Button
+            android:id="@+id/mqtt_disconnect"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="断开"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/mqtt_state"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:text="未连接"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp" />
+
+    <ListView
+        android:id="@+id/mqtt_list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:divider="@null" />
+</LinearLayout>

@@ -11,3 +11,8 @@
 -keep class org.json.** { *; }
 -keep class org.jsoup.** { *; }
 -dontwarn org.jsoup.**
+# 新增协议库
+-keep class org.eclipse.paho.** { *; }
+-dontwarn org.eclipse.paho.**
+-keep class org.apache.commons.net.** { *; }
+-dontwarn org.apache.commons.net.**
