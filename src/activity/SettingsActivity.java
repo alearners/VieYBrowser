@@ -130,6 +130,20 @@ public class SettingsActivity extends BaseActivity {
 		addItem("脚本市场地址", v -> showPluginMarketDialog());
 		addItem("ed2k 链接 / HTTP 多源下载", v -> startActivity(new Intent(this, LinkDownloadActivity.class)));
 		addItem("悬浮窗浏览（Service + WebView 浮层）", v -> toggleFloatWindow());
+		addItem("eD2k 自检（MD4/RC4/包解析）", v -> new android.app.AlertDialog.Builder(this)
+				.setTitle("eD2k 自检")
+				.setMessage(Ed2kSelfTest.run(this))
+				.setPositiveButton("关闭", null).show());
+		addItem("eD2k 端口 / 上传槽", v -> showEd2kPortDialog());
+		addSwitchItem("混淆握手（已知对端 hash 时启用）", getPrefs(this).getBoolean("ed2k_obf", true),
+				(v, on) -> getPrefs(this).edit().putBoolean("ed2k_obf", on).apply());
+		addSwitchItem("Kad UDP（实验性，默认关闭）", getPrefs(this).getBoolean("ed2k_kad", false),
+				(v, on) -> {
+					getPrefs(this).edit().putBoolean("ed2k_kad", on).apply();
+					if (on) KadNode.instance(this).startUdp();
+					else KadNode.instance(this).stopUdp();
+				});
+		addItem("共享目录 / 开启上传服务", v -> toggleUpload());
 		
 		textToolbarPosition = addValueItem(getString(R.string.toolbar_position), v -> showToolbarPosDialog());
 		textHomeMode = addValueItem(getString(R.string.home_mode), v -> showHomeModeDialog());
@@ -150,6 +164,44 @@ public class SettingsActivity extends BaseActivity {
 					PluginStore.setMarketUrl(this, et.getText().toString());
 					Toast.makeText(this, "已保存，可从插件页右上角打开", Toast.LENGTH_SHORT).show();
 				}).setNegativeButton("取消", null).show();
+	}
+
+	private void showEd2kPortDialog() {
+		android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+		box.setOrientation(android.widget.LinearLayout.VERTICAL);
+		android.widget.EditText port = new android.widget.EditText(this);
+		port.setText(String.valueOf(getPrefs(this).getInt("ed2k_port", 4662)));
+		port.setHint("TCP 端口");
+		android.widget.EditText slots = new android.widget.EditText(this);
+		slots.setText(String.valueOf(getPrefs(this).getInt("ed2k_upload_slots", 2)));
+		slots.setHint("上传槽数");
+		box.addView(port);
+		box.addView(slots);
+		new android.app.AlertDialog.Builder(this).setTitle("eD2k 端口 / 上传槽")
+				.setView(box)
+				.setPositiveButton("保存", (d, w) -> {
+					try {
+						int p = Integer.parseInt(port.getText().toString().trim());
+						int s = Integer.parseInt(slots.getText().toString().trim());
+						getPrefs(this).edit().putInt("ed2k_port", p).putInt("ed2k_upload_slots", Math.max(1, Math.min(8, s))).apply();
+						kawaii.viey.browser.Ed2kUploader.instance(this).stop();
+						Toast.makeText(this, "已保存，重启上传服务后生效 :" + p, Toast.LENGTH_SHORT).show();
+					} catch (Exception e) {
+						Toast.makeText(this, "端口/槽数需为数字", Toast.LENGTH_SHORT).show();
+					}
+				}).setNegativeButton("取消", null).show();
+	}
+
+	private void toggleUpload() {
+		kawaii.viey.browser.Ed2kUploader up = kawaii.viey.browser.Ed2kUploader.instance(this);
+		if (up.isRunning()) {
+			up.stop();
+			Toast.makeText(this, "上传服务已停止", Toast.LENGTH_SHORT).show();
+			return;
+		}
+		java.util.List<kawaii.viey.browser.SharedFiles.Entry> list = kawaii.viey.browser.SharedFiles.scan(this);
+		up.start();
+		Toast.makeText(this, "上传服务已启动，共享 " + list.size() + " 个文件", Toast.LENGTH_SHORT).show();
 	}
 
 	private void toggleFloatWindow() {

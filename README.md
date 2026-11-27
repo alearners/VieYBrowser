@@ -35,7 +35,9 @@ The installation package is approximately 10 MB in size.
 - 订阅：RSS/Atom 源管理，兼容阅读 App(Legado) `rssSources.json` 字段，支持导入/导出 `backup.zip` 订阅备份
 - CSP 安全网页字体：`shouldInterceptRequest` 返回同源 `/__vie__/font.ttf` + `font.js`，CSP 白名单内加载，规避 `zhihu.com/appview/special` 这类拦截
 - 用户脚本插件：`.user.js` 导入（粘贴 / URL）、`@match`/`@include` 匹配、启停、脚本市场地址可配
-- ed2k + 多源下载：`ed2k://` 链接解析、MD4/chunk ed2k hash 校验、eD2k 服务器登录/取源（v0.1 骨架）、HTTP 镜像多源分段下载 + 断点续传
+- ed2k 内核（`Ed2kProto` / `PeerClient` / `Ed2kDownload` / `Ed2kUploader`）：`ed2k://` 解析、服务器登录 + 取源、对端握手、FILEREQUEST/SLOT/REQUEST_PARTS/SENDING_PART、180KB 块调度、9.72MB chunk MD4 校验、`.part` 续传、上传队列 + 共享目录、入站混淆握手（RC4/MD5，eMule 规范）
+- 多源下载：HTTP 镜像分段并发 + 断点续传 + ed2k hash 校验（与 P2P 并行保留）
+- eD2k 自检：设置页可跑 MD4 向量 / RC4 对称 / 包编解码 / chunk hash 一致性
 - 悬浮窗浏览：`FloatService`（Service + WebView 浮层，可拖动标题栏，复用字体/资源拦截链）
 - 运行日志、安全浏览拦截、看图模式、MQTT / FTP 协议工具
 
@@ -80,7 +82,10 @@ The installation package is approximately 10 MB in size.
 - Support data: blob: file downloads
 - Modular parsing of text/gemini, text/scroll, and other file types
 - Support download functionality for various smolnet protocols
-- （VieY）ed2k 的 P2P 传输段与 Kad/AICH/上传、混淆握手仍待实现，目前只做服务器取源 + HTTP 多源搬运
+- （VieY）AICH 恢复：已做 chunk 失败标脏重下与 AICH 应答解析，AICH 哈希树自愈（按 180KB 块恢复）未完成
+- （VieY）Kad：节点表 / 源缓存 / bootstrap 发包已做，Kademlia2 桶路由、关键字发布与搜索未完成（默认关闭）
+- （VieY）uTP：eMule/eD2k 协议本身没有 uTP（uTP/BEP-29 属于 BitTorrent），这里不做；多源仍是 HTTP/TCP
+- （VieY）混淆握手：出站需知道对端 user hash（源列表常缺），缺失时自动降级明文；入站混淆已实现
 - （VieY）插件 `@match` 支持 `*` 通配，尚不支持 `@grant`/`GM_*` 完整语义（可用 `viek.http` 走 Java 代理）
 
 ---

@@ -32,6 +32,13 @@
             android:layout_weight="1" android:text="开始下载" android:textSize="12sp" />
     </LinearLayout>
 
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+        <Button android:id="@+id/link_p2p" android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="P2P 下载（eD2k 内核）" android:textSize="12sp" />
+        <Button android:id="@+id/link_p2p_stop" android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="停止 P2P" android:textSize="12sp" />
+    </LinearLayout>
+
     <ProgressBar android:id="@+id/link_progress" style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent" android:layout_height="8dp" android:max="100" android:progress="0" />
 
