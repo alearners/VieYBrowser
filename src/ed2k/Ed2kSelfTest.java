@@ -74,7 +74,98 @@ public class Ed2kSelfTest {
         if (userHash) pass++;
         else fail++;
 
+        String loop = loopback(c);
+        boolean loopOk = loop.startsWith("PASS");
+        sb.append(loop).append("\n");
+        if (loopOk) pass++;
+        else fail++;
+
         sb.append("\n结果：").append(pass).append(" 通过，").append(fail).append(" 失败");
         return sb.toString();
     }
+
+    /** 环回 P2P：本机上传服务 + PeerClient 走完整状态机（HELLO/FILEREQ/SLOT/REQPARTS/SENDING_PART） */
+    private static String loopback(Context c) {
+        File dir = PartFile.dir(c);
+        if (!dir.exists()) dir.mkdirs();
+        File f = new File(dir, "viey_loop_test.bin");
+        String hash;
+        long size;
+        try {
+            byte[] data = new byte[65536];
+            new Random(29).nextBytes(data);
+            try (FileOutputStream fos = new FileOutputStream(f)) {
+                fos.write(data);
+            }
+            hash = Ed2kHash.hashFile(f);
+            size = f.length();
+        } catch (Exception e) {
+            return "FAIL 环回 P2P：造文件失败 " + e.getMessage();
+        }
+
+        SharedFiles.add(c, f);
+        Ed2kUploader up = Ed2kUploader.instance(c);
+        boolean alreadyRunning = up.isRunning();
+        if (!alreadyRunning) up.start();
+        for (int i = 0; i < 40 && !up.isRunning(); i++) {
+            try { Thread.sleep(50); } catch (InterruptedException ignored) {}
+        }
+        if (!up.isRunning()) {
+            f.delete();
+            return "FAIL 环回 P2P：上传服务未就绪（端口被占用？）";
+        }
+        int port = VieYApp.getPrefs(c).getInt("ed2k_port", 4662);
+
+        final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+        final byte[][] got = new byte[1][];
+        final String[] err = new String[1];
+        PeerClient.Sink sink = new PeerClient.Sink() {
+            public void onLog(String msg) {}
+
+            public void onAccept(PeerClient p) {}
+
+            public void onHashset(PeerClient p, java.util.List<String> hashes) {}
+
+            public void onPart(PeerClient p, long start, byte[] data) {
+                got[0] = data;
+                done.countDown();
+            }
+
+            public void onIdle(PeerClient p) {
+                if (got[0] != null) return;
+                try {
+                    p.requestBlocks(new int[]{0}, new long[]{0}, new int[]{(int) size});
+                } catch (Exception e) {
+                    err[0] = e.getMessage();
+                    done.countDown();
+                }
+            }
+
+            public void onDead(PeerClient p, String reason) {
+                err[0] = reason;
+                done.countDown();
+            }
+        };
+
+        PeerClient pc = new PeerClient("127.0.0.1", port, hash, size, Ed2kProto.localUserHash(c), null, sink, false);
+        long t0 = System.currentTimeMillis();
+        pc.start();
+        boolean ok;
+        try {
+            ok = done.await(15, java.util.concurrent.TimeUnit.SECONDS) && got[0] != null
+                    && Ed2kHash.hex(Ed2kHash.md4(got[0])).equals(hash);
+        } catch (InterruptedException e) {
+            ok = false;
+        }
+        if (ok && err[0] != null) ok = false;
+        long ms = System.currentTimeMillis() - t0;
+        pc.close("自检结束");
+        SharedFiles.remove(hash);
+        f.delete();
+        if (!alreadyRunning) up.stop();
+        String res = ok ? "PASS 环回 P2P 传输 64KB / " + ms + "ms / " + (got[0] == null ? 0 : got[0].length) + "B"
+                : "FAIL 环回 P2P：收到 " + (got[0] == null ? 0 : got[0].length) + "B，错误=" + err[0];
+        return res;
+    }
+
 }

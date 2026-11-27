@@ -30,14 +30,15 @@ The installation package is approximately 10 MB in size.
 - Supports external applications accessing internal files via local storage
 - Minimum support for Android 5
 
-### VieY 自研扩展（0.6.0-dev）
+### VieY 自研扩展（0.7.1-dev）
 
 - 订阅：RSS/Atom 源管理，兼容阅读 App(Legado) `rssSources.json` 字段，支持导入/导出 `backup.zip` 订阅备份
 - CSP 安全网页字体：`shouldInterceptRequest` 返回同源 `/__vie__/font.ttf` + `font.js`，CSP 白名单内加载，规避 `zhihu.com/appview/special` 这类拦截
 - 用户脚本插件：`.user.js` 导入（粘贴 / URL）、`@match`/`@include` 匹配、启停、脚本市场地址可配
 - ed2k 内核（`Ed2kProto` / `PeerClient` / `Ed2kDownload` / `Ed2kUploader`）：`ed2k://` 解析、服务器登录 + 取源、对端握手、FILEREQUEST/SLOT/REQUEST_PARTS/SENDING_PART、180KB 块调度、9.72MB chunk MD4 校验、`.part` 续传、上传队列 + 共享目录、入站混淆握手（RC4/MD5，eMule 规范）
 - 多源下载：HTTP 镜像分段并发 + 断点续传 + ed2k hash 校验（与 P2P 并行保留）
-- eD2k 自检：设置页可跑 MD4 向量 / RC4 对称 / 包编解码 / chunk hash 一致性
+- eD2k 自检（后台线程，不阻塞 UI）：MD4 向量 / RC4 对称 / 包编解码 / chunk hash 一致性 / **环回 P2P 传输**（本机上传服务 + `PeerClient` 跑完整 HELLO→FILEREQ→SLOT→REQPARTS→SENDING_PART 状态机，校验收到数据 MD4）
+- 真机实测（OnePlus 8T / KB2000 / Android 11）：6 项自检全部 PASS，环回 P2P 64KB 约 17ms 完成
 - 悬浮窗浏览：`FloatService`（Service + WebView 浮层，可拖动标题栏，复用字体/资源拦截链）
 - 运行日志、安全浏览拦截、看图模式、MQTT / FTP 协议工具
 

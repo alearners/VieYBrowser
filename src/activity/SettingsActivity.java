@@ -130,10 +130,7 @@ public class SettingsActivity extends BaseActivity {
 		addItem("脚本市场地址", v -> showPluginMarketDialog());
 		addItem("ed2k 链接 / HTTP 多源下载", v -> startActivity(new Intent(this, LinkDownloadActivity.class)));
 		addItem("悬浮窗浏览（Service + WebView 浮层）", v -> toggleFloatWindow());
-		addItem("eD2k 自检（MD4/RC4/包解析）", v -> new android.app.AlertDialog.Builder(this)
-				.setTitle("eD2k 自检")
-				.setMessage(Ed2kSelfTest.run(this))
-				.setPositiveButton("关闭", null).show());
+		addItem("eD2k 自检（MD4/RC4/包解析/环回 P2P）", v -> runEd2kSelfTest());
 		addItem("eD2k 端口 / 上传槽", v -> showEd2kPortDialog());
 		addSwitchItem("混淆握手（已知对端 hash 时启用）", getPrefs(this).getBoolean("ed2k_obf", true),
 				(v, on) -> getPrefs(this).edit().putBoolean("ed2k_obf", on).apply());
@@ -751,5 +748,29 @@ public class SettingsActivity extends BaseActivity {
 			return true;
 		}
 		return super.onOptionsItemSelected(item);
+	}
+
+	private void runEd2kSelfTest() {
+		final android.app.ProgressDialog pd = new android.app.ProgressDialog(this);
+		pd.setMessage("正在自检（含环回 P2P 传输）…");
+		pd.setCancelable(false);
+		pd.show();
+		new Thread(() -> {
+			String r;
+			try {
+				r = Ed2kSelfTest.run(SettingsActivity.this);
+			} catch (Throwable t) {
+				r = "自检异常：" + t.getClass().getSimpleName() + " " + t.getMessage();
+			}
+			final String result = r;
+			runOnUiThread(() -> {
+				if (isFinishing()) return;
+				try { pd.dismiss(); } catch (Exception ignored) {}
+				new android.app.AlertDialog.Builder(SettingsActivity.this)
+						.setTitle("eD2k 自检")
+						.setMessage(result)
+						.setPositiveButton("关闭", null).show();
+			});
+		}, "ed2k-selftest").start();
 	}
 }
