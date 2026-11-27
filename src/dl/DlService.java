@@ -107,7 +107,7 @@ public class DlService extends Service {
                 @Override
                 public void onDone(boolean ok, String msg, File file) {
                     long t = cur != null ? cur.totalSize() : size;
-                    DlStore.publish(DlService.this, name, ok ? "done" : "failed", t, t, msg, msg);
+                    DlStore.publish(DlService.this, name, ok ? "done" : "failed", t, t, "", msg);
                     NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
                     if (nm != null) nm.notify(NOTIFY_ID, notification(ok ? "下载完成 " + name : "下载失败：" + msg, 0, 0));
                     stopForeground(false);
