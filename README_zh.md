@@ -51,6 +51,31 @@ export ANDROID_HOME=/path/to/android-sdk
 产物：`build/outputs/apk/debug/VieY-debug.apk`
 
 
+---
+
+## 2.3 从 Vie 6.5.0 移植的能力（dev/feed-subscription → main）
+
+对照 `Vie_6.5.0.apk`（母项目 Vie，`kawaii.vie`，versionCode 106500）与 5.1.9 / 仓库 6.0.0 的差异逐项落地：
+
+| Vie 6.5.0 能力 | VieY 实现 | 位置 |
+|---|---|---|
+| `gm` 脚本：XHR 全量代理（json/document/blob/arraybuffer/stream、进度、超时） | Java 侧 `viey.http(...)` 异步请求 + `viek.http / viek.fetch` JS API，二进制走 base64 | `src/util/WebJs.java`、`assets/js/viey-bridge.js` |
+| `end` 脚本：`console.*` → 运行日志 | `viey.console(level,msg)` 落盘 + 页面报错/rejection 捕获 | 同上、`src/util/LogStore.java` |
+| `log.html` 日志面板 | 运行日志页（页面/资源/脚本/MQTT/FTP 分类行） | `src/activity/LogActivity.java` |
+| `journal` 资源日志 | `shouldInterceptRequest` 记录主框架请求 | `src/view/WebViey.java` |
+| 安全浏览拦截页（钓鱼/恶意/继续访问） | 内置 `blocklist.txt` 规则 + 警告页（返回 / 继续访问） | `src/util/SafeBrowse.java`、`assets/blocklist.txt` |
+| `seimage` 看图模式 | 点图放大覆盖层（图片/背景图，点击退出） | `assets/js/vie-image.js` |
+| `mqttv3`（Paho MQTT） | MQTT 订阅面板：连接、订阅、消息列表、断线提示 | `src/net/MqttActivity.java` |
+| `net`（Apache Commons Net） | FTP 目录浏览 + 单文件下载（SMTP/TFTP/NNTP 同库已引入） | `src/net/FtpActivity.java` |
+| 同源注入脚本（CSP 站点可用） | `/__vie__/js/<name>.js` 由 `shouldInterceptRequest` 返回，`script-src` 被拦时回退本地执行 | `src/util/VieAsset.java` |
+| 全局字体 | 网页字体注入（同源 `font.ttf` + 二进制 FontFace） | `src/util/FontInject.java` |
+
+**未移植（说明）**：
+- `ed2k` / jmule 引擎：需要完整 P2P 内核与自有库，非短路径移植，暂不引入。
+- 桌面小部件（awzxWidget）、快捷磁贴（awzxTile）、壁纸服务：偏系统集成，与浏览器核心无关。
+- 存储配额面板、插件机制（下载插件全量包）、悬浮窗浏览、鼠标键盘事件注入：6.5.0 的宿主引擎机制（iApp/Lua 运行时）绑定较深，需按其脚本协议重做，暂列后续。
+
+
 ## 2. 功能展示
 
 - 支持 smolnet 身份证书的请求
