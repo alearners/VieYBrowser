@@ -20,7 +20,7 @@ public class SettingsActivity extends BaseActivity {
 	
 	private LinearLayout contentContainer;
 	
-	private TextView appVersion, textDateFormat, textToolbarPosition, textCertStatus, textDownloadPath, textLanguage, textHomeUrl, textHomeMode, textSearchEngine, textMaxConcurrent, textDefaultThreads, textMaxRetry;
+	private TextView appVersion, textDateFormat, textToolbarPosition, textCertStatus, textDownloadPath, textLanguage, textHomeUrl, textHomeMode, textSearchEngine, textMaxConcurrent, textDefaultThreads, textMaxRetry, textWebFont;
 	private Switch switchPull, switchDarkMode, switchPreferIpv4, switchCustomTab, switchVolumePage, switchDownloadNotice, switchApkAutoInstall;
 	private ImageView appLogo;
 	
@@ -104,6 +104,25 @@ public class SettingsActivity extends BaseActivity {
 		switchVolumePage = addSwitchItem(getString(R.string.volume_key_page), VieYApp.isVolumeKeyPage(this), (v, is) -> VieYApp.setVolumeKeyPage(this, is));
 		
 		addSection(getString(R.string.customize));
+		
+		addSection("订阅");
+		addItem("订阅源管理 / RSS·Atom", v -> startActivity(new Intent(this, FeedActivity.class)));
+		addItem("导入·导出 阅读(Legado) 订阅备份", v -> startActivity(new Intent(this, FeedActivity.class)));
+		
+		addSection("网页字体");
+		addSwitchItem("网页自定义字体注入（CSP 安全）", FontInject.enabled(this), (v, is) -> FontInject.setEnabled(this, is));
+		textWebFont = addValueItem("网页字体文件 (.ttf/.otf)", v -> pickWebFont());
+		textWebFont.setText(FontInject.fontFile(this) == null ? "未选择" : FontInject.fontFile(this).getName());
+		
+		addSection("浏览增强");
+		addSwitchItem("安全浏览拦截（可疑域名提示页）", SafeBrowse.enabled(this), (v, is) -> SafeBrowse.setEnabled(this, is));
+		addSwitchItem("看图模式（点图放大）", "true".equals(getPrefs(this).getString("image_mode", "false")), (v, is) -> getPrefs(this).edit().putString("image_mode", is ? "true" : "false").apply());
+		addItem("运行日志 / 资源日志", v -> startActivity(new Intent(this, LogActivity.class)));
+		
+		addSection("协议工具");
+		addItem("MQTT 订阅（Paho mqttv3）", v -> startActivity(new Intent(this, MqttActivity.class)));
+		addItem("FTP 目录浏览 / 下载（commons-net）", v -> startActivity(new Intent(this, FtpActivity.class)));
+		addItem("Java 网络代理已启用（页面可用 viek.http）", v -> i.utw("网络代理", "页面脚本可调用 viek.http(url, opts) 经 Java 发起请求，绕同源限制；也可用 viek.fetch。"));
 		
 		textToolbarPosition = addValueItem(getString(R.string.toolbar_position), v -> showToolbarPosDialog());
 		textHomeMode = addValueItem(getString(R.string.home_mode), v -> showHomeModeDialog());
@@ -551,6 +570,17 @@ public class SettingsActivity extends BaseActivity {
 		});
 	}
 	
+	private void pickWebFont() {
+		Intent it = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+		it.addCategory(Intent.CATEGORY_OPENABLE);
+		it.setType("*/*");
+		try {
+			startActivityForResult(it, 4101);
+		} catch (Exception e) {
+			i.twi(R.string.error_occurred);
+		}
+	}
+	
 	private void showSearchEngineDialog() {
 		Intent intent = new Intent(this, EngineActivity.class);
 		startActivityForResult(intent, 10001);
@@ -559,6 +589,23 @@ public class SettingsActivity extends BaseActivity {
 	@Override
 	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 		super.onActivityResult(requestCode, resultCode, data);
+		if (requestCode == 4101 && resultCode == RESULT_OK && data != null && data.getData() != null) {
+			try (java.io.InputStream in = getContentResolver().openInputStream(data.getData())) {
+				File dir = new File(getFilesDir(), "diy");
+				if (!dir.exists()) dir.mkdirs();
+				File target = new File(dir, "网页字体");
+				try (java.io.OutputStream out = new java.io.FileOutputStream(target)) {
+					byte[] buf = new byte[8192];
+					int n;
+					while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+				}
+				textWebFont.setText("网页字体（" + (target.length() / 1024) + " KB）");
+				i.twi(R.string.saved);
+			} catch (Exception e) {
+				i.twi(R.string.error_occurred);
+			}
+			return;
+		}
 		if (requestCode == 10001 && resultCode == RESULT_OK && data != null) {
 			String url = data.getStringExtra(EngineActivity.EXTRA_ENGINE_URL);
 			if (url != null && !url.isEmpty()) {

@@ -1,0 +1,5 @@
+# VieY 安全浏览拦截名单（host 或 host 后缀，一行一条；* 前缀表示后缀匹配）
+# 可放到 Android/data/<包名>/files/blocklist.txt 覆盖本内置名单
+*.malware-test.example
+*.phishing-test.example
+malware.wicar.org

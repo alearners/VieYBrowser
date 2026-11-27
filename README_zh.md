@@ -16,7 +16,64 @@ VieY 是本人 Vie 项目的一个分支，去除了多余功能，保留并且�
 
 安装包体积约 10 MB
 
+
 ---
+
+## 2.1 新增功能（dev/feed-subscription 分支）
+
+**订阅 / RSS**
+- 订阅源管理：新增、删除、复制链接，支持 RSS 2.0 / RSS 1.0(RDF) / Atom
+- 兼容「阅读(Legado)」订阅源规则：`ruleArticles / ruleTitle / ruleLink / rulePubDate / ruleDescription / ruleImage`，栏目规则式 HTML 列表也能解析
+- 备份恢复：直接读取「阅读」的 `backup.zip` 内 `rssSources.json`，按订阅地址去重合并导入；导出为同结构的 `VieY-rss-backup.zip`，可直接在「阅读」里恢复
+- 入口：设置 → 订阅
+
+**网页自定义字体（CSP 安全）**
+- 带 CSP 的站点（如 `zhihu.com/appview/special`）会拦截内联 `@font-face` 和 `data:` 字体
+- 实现方式：在 `shouldInterceptRequest` 里用「页面同源 URL」返回字体与注入脚本
+  - `https://<当前页面 host>/__vie__/font.ttf` → 字体字节
+  - `https://<当前页面 host>/__vie__/font.js` → 注入脚本
+- 同源资源本身在 CSP 允许名单内，不需要放行 `data:` / `unsafe-eval`
+- 注入脚本用二进制 `FontFace` + `CSSStyleSheet.adoptedStyleSheets` 应用，优先网络加载 `<script src>`，被 `script-src` 拦截时退回 WebView 直接执行
+- 入口：设置 → 网页字体（开关 + 选择 `.ttf/.otf`）
+
+---
+
+## 2.2 构建
+
+需要 JDK 17 + Android SDK（compileSdk 34 / build-tools 34.0.0）。
+
+```bash
+export JAVA_HOME=/path/to/jdk-17
+export ANDROID_HOME=/path/to/android-sdk
+./gradlew assembleDebug
+```
+
+产物：`build/outputs/apk/debug/VieY-debug.apk`
+
+
+---
+
+## 2.3 从 Vie 6.5.0 移植的能力（dev/feed-subscription → main）
+
+对照 `Vie_6.5.0.apk`（母项目 Vie，`kawaii.vie`，versionCode 106500）与 5.1.9 / 仓库 6.0.0 的差异逐项落地：
+
+| Vie 6.5.0 能力 | VieY 实现 | 位置 |
+|---|---|---|
+| `gm` 脚本：XHR 全量代理（json/document/blob/arraybuffer/stream、进度、超时） | Java 侧 `viey.http(...)` 异步请求 + `viek.http / viek.fetch` JS API，二进制走 base64 | `src/util/WebJs.java`、`assets/js/viey-bridge.js` |
+| `end` 脚本：`console.*` → 运行日志 | `viey.console(level,msg)` 落盘 + 页面报错/rejection 捕获 | 同上、`src/util/LogStore.java` |
+| `log.html` 日志面板 | 运行日志页（页面/资源/脚本/MQTT/FTP 分类行） | `src/activity/LogActivity.java` |
+| `journal` 资源日志 | `shouldInterceptRequest` 记录主框架请求 | `src/view/WebViey.java` |
+| 安全浏览拦截页（钓鱼/恶意/继续访问） | 内置 `blocklist.txt` 规则 + 警告页（返回 / 继续访问） | `src/util/SafeBrowse.java`、`assets/blocklist.txt` |
+| `seimage` 看图模式 | 点图放大覆盖层（图片/背景图，点击退出） | `assets/js/vie-image.js` |
+| `mqttv3`（Paho MQTT） | MQTT 订阅面板：连接、订阅、消息列表、断线提示 | `src/net/MqttActivity.java` |
+| `net`（Apache Commons Net） | FTP 目录浏览 + 单文件下载（SMTP/TFTP/NNTP 同库已引入） | `src/net/FtpActivity.java` |
+| 同源注入脚本（CSP 站点可用） | `/__vie__/js/<name>.js` 由 `shouldInterceptRequest` 返回，`script-src` 被拦时回退本地执行 | `src/util/VieAsset.java` |
+| 全局字体 | 网页字体注入（同源 `font.ttf` + 二进制 FontFace） | `src/util/FontInject.java` |
+
+**未移植（说明）**：
+- `ed2k` / jmule 引擎：需要完整 P2P 内核与自有库，非短路径移植，暂不引入。
+- 桌面小部件（awzxWidget）、快捷磁贴（awzxTile）、壁纸服务：偏系统集成，与浏览器核心无关。
+- 存储配额面板、插件机制（下载插件全量包）、悬浮窗浏览、鼠标键盘事件注入：6.5.0 的宿主引擎机制（iApp/Lua 运行时）绑定较深，需按其脚本协议重做，暂列后续。
 
 
 ## 2. 功能展示

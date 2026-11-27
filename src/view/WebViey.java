@@ -59,6 +59,8 @@ public class WebViey extends WebView {
 	private String smolnetTxt = "";
 	private String smolnetMime = "";
 	private String smolnetToken = "";
+	private String waivedUrl = "";
+	private String lastJournalUrl = "";
 	
 	private volatile Thread mThread;
 	private volatile String murl;
@@ -119,6 +121,10 @@ public class WebViey extends WebView {
 	
 	private boolean isDark(){
 		return VieYApp.isDarkMode(getContext());
+	}
+	
+	private boolean isImageMode(){
+		return "true".equals(VieYApp.getPrefs(getContext()).getString("image_mode", "false"));
 	}
 	
 	private void initDir() {
@@ -419,6 +425,18 @@ public class WebViey extends WebView {
 				if (i.canRun(url)) {
 					return;
 				}
+				String threat = null;
+				try {
+					threat = SafeBrowse.threat(getContext(), url);
+				} catch (Exception ignored) {
+				}
+				if (threat != null && url != null && !url.equals(waivedUrl)) {
+					waivedUrl = url;
+					stopLoading();
+					loadDataWithBaseURL(null, SafeBrowse.warningHtml(url, threat), "text/html", "UTF-8", null);
+					LogStore.add(getContext(), "safe", "已拦截 " + url + "（" + threat + "）");
+					return;
+				}
 				injectJs();
 				murl = null;
 				super.onPageStarted(view, url, favicon);
@@ -444,8 +462,32 @@ public class WebViey extends WebView {
 			}
 			
 			@Override
+			public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view, android.webkit.WebResourceRequest request) {
+				try {
+					android.webkit.WebResourceResponse r = FontInject.intercept(getContext(), request);
+					if (r != null) return r;
+					r = VieAsset.intercept(getContext(), request);
+					if (r != null) return r;
+					if (request != null && request.getUrl() != null && request.isForMainFrame()) {
+						String u = request.getUrl().toString();
+						if (!u.equals(lastJournalUrl)) {
+							lastJournalUrl = u;
+							LogStore.journal(getContext(), "page", u);
+						}
+					}
+				} catch (Exception ignored) {
+				}
+				return super.shouldInterceptRequest(view, request);
+			}
+			
+			@Override
 			public void onPageFinished(WebView view, String url) {
 				injectJs();
+				if (!i.canRun(url)) {
+					FontInject.inject(view, url);
+					VieAsset.inject(view, url, "viey-bridge.js");
+					if (isImageMode()) VieAsset.inject(view, url, "vie-image.js");
+				}
 				murl = null;
 				super.onPageFinished(view, url);
 				url = urrl(url);
