@@ -166,37 +166,29 @@ public class FeedActivity extends BaseActivity {
     
     /** 导入入口：系统选择器 / 直接给设备路径（新文件常未被 MediaStore 索引） */
     private void pickImport() {
-        new AlertDialog.Builder(this)
-            .setTitle("导入订阅源")
-            .setMessage("路径导入请用应用目录（Android/data/kawaii.viey.browser/files/）")
-            .setItems(new String[]{"用系统文件选择器", "从应用目录 / 路径导入"}, (d, w) -> {
-                if (w == 1) importFromPath();
-                else pickImportDocument();
-            })
-            .show();
-    }
-
-    private void importFromPath() {
         EditText et = new EditText(this);
         et.setSingleLine(true);
         java.io.File def = new java.io.File(getExternalFilesDir(null), "rss_src.json");
         et.setText(def.getAbsolutePath());
         et.setTextSize(13);
         new AlertDialog.Builder(this)
-            .setTitle("从路径导入")
+            .setTitle("导入订阅源")
+            .setMessage("填应用目录下的文件名（Download 无读取权限）")
             .setView(et)
-            .setPositiveButton("导入", (d, w) -> {
-                String path = et.getText().toString().trim();
-                try (InputStream in = new java.io.FileInputStream(path)) {
-                    int added = FeedStore.importFrom(this, in);
-                    reload();
-                    Toast.makeText(this, "导入完成，新增 " + added + " 个订阅源", Toast.LENGTH_SHORT).show();
-                } catch (Exception e) {
-                    Toast.makeText(this, "导入失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
-                }
-            })
+            .setPositiveButton("导入", (d, w) -> doImportFromPath(et.getText().toString().trim()))
+            .setNeutralButton("系统选择器", (d, w) -> pickImportDocument())
             .setNegativeButton("取消", null)
             .show();
+    }
+
+    private void doImportFromPath(String path) {
+        try (InputStream in = new java.io.FileInputStream(path)) {
+            int added = FeedStore.importFrom(this, in);
+            reload();
+            Toast.makeText(this, "导入完成，新增 " + added + " 个订阅源", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "导入失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     private void pickImportDocument() {
