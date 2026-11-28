@@ -708,7 +708,13 @@ public class AdBlock {
 			} catch (Throwable ignored) {}
 			boolean frame = req.isForMainFrame();
 			int type = inferType(url, req);
+			if (android.util.Log.isLoggable("viey-adblock", android.util.Log.DEBUG)) {
+				android.util.Log.d("viey-adblock", "req frame=" + frame + " type=" + type + " url=" + url);
+			}
 			boolean hitIt = frame ? blockedDocument(c, url) : blocked(c, url, referer != null ? referer : url, type);
+			if (android.util.Log.isLoggable("viey-adblock", android.util.Log.DEBUG)) {
+				android.util.Log.d("viey-adblock", "  -> hit=" + hitIt + " enabled=" + enabled(c) + " rules=" + ruleCount(c));
+			}
 			if (!hitIt) return null;
 			WebResourceResponse r = new WebResourceResponse("text/plain", "utf-8",
 				new ByteArrayInputStream(new byte[0]));
@@ -786,6 +792,39 @@ public class AdBlock {
 		// 主框架也允许普通主机规则命中，但只在带 $document 时才拦，避免误伤
 		if (n > 0) { hit(c); return true; }
 		return false;
+	}
+
+	/** 离线自检：用样例 URL 走一遍匹配逻辑，返回报告文本 */
+	public static String selfTest(Context c) {
+		String[][] samples = new String[][]{
+			{"https://hm.baidu.com/hm.js?abc", "https://www.example.com/"},
+			{"https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js", "https://www.example.com/"},
+			{"https://example.com/app.js", "https://www.example.com/"},
+			{"https://cdn.example.com/ad_banner/300x250.png", "https://www.example.com/"},
+			{"https://good.example.com/app.js", "https://www.example.com/"}
+		};
+		StringBuilder b = new StringBuilder();
+		b.append("规则条数：").append(ruleCount(c)).append("\n");
+		b.append("开关：").append(enabled(c) ? "开" : "关").append("\n\n");
+		int n = 0;
+		for (String[] sm : samples) {
+			boolean hit = blocked(c, sm[0], sm[1], inferTypeNoReq(sm[0]));
+			if (hit) n++;
+			b.append(hit ? "拦截  " : "放行  ").append(sm[0]).append('\n');
+		}
+		b.append("\n命中 ").append(n).append(" / ").append(samples.length)
+			.append("\n累计拦截：").append(hits(c)).append(" 次");
+		return b.toString();
+	}
+
+	private static int inferTypeNoReq(String url) {
+		String low = url.toLowerCase();
+		int q = low.indexOf('?');
+		String path = q >= 0 ? low.substring(0, q) : low;
+		if (path.endsWith(".js")) return T_SCRIPT;
+		if (path.endsWith(".css")) return T_STYLE;
+		if (path.endsWith(".png") || path.endsWith(".jpg") || path.endsWith(".gif") || path.endsWith(".webp")) return T_IMAGE;
+		return T_OTHER;
 	}
 
 	public static int updateSubs(Context c) throws Exception {

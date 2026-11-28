@@ -10,8 +10,8 @@ android {
         applicationId "kawaii.viey.browser"
         minSdk 21
         targetSdk 34
-        versionCode 202611501
-        versionName "0.12.1-dev"
+        versionCode 202611521
+        versionName "0.12.3-dev"
         resConfigs 'zh', 'zh-rTW', 'en'
     }
 

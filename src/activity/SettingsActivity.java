@@ -195,6 +195,11 @@ public class SettingsActivity extends BaseActivity {
 				.show();
 		}).setText(AdBlock.offSiteCount(this) + " 个");
 		addValueItem("已拦截请求", v -> showAdBlockStats()).setText(AdBlock.hits(this) + " 次");
+		addItem("拦截自检（离线样例）", v -> new android.app.AlertDialog.Builder(this)
+			.setTitle("拦截自检")
+			.setMessage(AdBlock.selfTest(this))
+			.setPositiveButton("知道了", null)
+			.show());
 
 		if (OpLevel.get(this) >= OpLevel.POWER) {
 		addSection("备份与恢复");
