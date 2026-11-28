@@ -110,6 +110,13 @@ public class SettingsActivity extends BaseActivity {
 		addItem("导入·导出 阅读(Legado) 订阅备份", v -> startActivity(new Intent(this, FeedActivity.class)));
 		addItem("RSS 源仓库（一键导入订阅源）", v -> showRssRepoDialog());
 		addSwitchItem("列表级 @js 规则沙箱（离屏 WebView）", RuleJs.enabled(this), (v, is) -> RuleJs.setEnabled(this, is));
+		addItem("沙箱自检（内置样例，验证 @js 执行）", v -> {
+			Toast.makeText(this, "自检中…", Toast.LENGTH_SHORT).show();
+			new Thread(() -> {
+				String r = RuleJs.selfTest(getApplicationContext());
+				runOnUiThread(() -> Toast.makeText(this, r, Toast.LENGTH_LONG).show());
+			}).start();
+		});
 		addItem("全部订阅文章（聚合时间线）", v -> {
 			Intent it = new Intent(this, FeedItemsActivity.class);
 			it.putExtra(FeedItemsActivity.EXTRA_ALL, true);

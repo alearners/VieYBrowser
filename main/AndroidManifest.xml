@@ -2,8 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     package="kawaii.viey.browser"
-    android:versionCode="202611381"
-    android:versionName="0.11.8-dev">
+    android:versionCode="202611391"
+    android:versionName="0.11.9-dev">
 
     <uses-sdk
         android:minSdkVersion="21"

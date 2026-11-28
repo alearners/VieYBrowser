@@ -47,6 +47,28 @@ public class RuleJs {
             || js(s.rulePubDate) || js(s.ruleDescription) || js(s.ruleImage);
     }
 
+    /** 内置样例自检：必须从工作线程调用（内部会等待主线程 WebView） */
+    public static String selfTest(Context c) {
+        FeedSource s = new FeedSource();
+        s.name = "自检源";
+        s.url = "https://example.com/";
+        s.ruleArticles = "@js: java.getElements('div.item')";
+        s.ruleTitle = "a@text";
+        s.ruleLink = "a@href";
+        s.rulePubDate = "span@text";
+        s.ruleArticles = s.ruleArticles;
+        String html = "<html><body>"
+            + "<div class='item'><a href='/p/1'>样例标题一</a><span>2026-11-01</span></div>"
+            + "<div class='item'><a href='/p/2'>样例标题二</a><span>2026-11-02</span></div>"
+            + "</body></html>";
+        long t0 = System.currentTimeMillis();
+        List<FeedParser.Article> list = parse(c, s, s.url, html);
+        long ms = System.currentTimeMillis() - t0;
+        if (list.isEmpty()) return "未解析到条目（开关关闭或沙箱失败，耗时 " + ms + "ms）";
+        FeedParser.Article a = list.get(0);
+        return "解析 " + list.size() + " 条，耗时 " + ms + "ms；首条：" + a.title + " → " + a.link;
+    }
+
     private static boolean js(String rule) {
         return rule != null && rule.trim().startsWith("@js:");
     }
@@ -69,7 +91,9 @@ public class RuleJs {
                 wv = new WebView(c.getApplicationContext());
                 WebSettings ws = wv.getSettings();
                 ws.setJavaScriptEnabled(true);
-                ws.setBlockNetworkLoads(true);
+                ws.setBlockNetworkLoads(false);
+                ws.setAllowFileAccess(false);
+                ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
                 ws.setBlockNetworkImage(true);
                 ws.setDomStorageEnabled(true);
                 final WebView fwv = wv;
@@ -198,7 +222,20 @@ public class RuleJs {
             + "  getCookie: function(){ return ''; },\n"
             + "  put: function(k,v){ try{ localStorage.setItem(k,String(v)); }catch(e){} },\n"
             + "  get: function(k){ try{ return localStorage.getItem(k)||''; }catch(e){ return ''; } },\n"
-            + "  ajax: function(u){ console.log('java.ajax 不支持同步请求：'+u); return ''; }\n"
+            + "  ajax: function(u, body){\n"
+            + "    try{\n"
+            + "      var x=new XMLHttpRequest();\n"
+            + "      x.open(body===undefined?'GET':'POST', u, false);\n"
+            + "      x.setRequestHeader('Accept','*/*');\n"
+            + "      var h=null;\n"
+            + "      try{ if(SRC && SRC.header){ h=(typeof SRC.header==='string')?JSON.parse(SRC.header):SRC.header; } }catch(e){}\n"
+            + "      if(h){ for(var k in h){ try{ x.setRequestHeader(k, String(h[k])); }catch(e){} } }\n"
+            + "      if(body!==undefined){ try{ x.setRequestHeader('Content-Type','application/x-www-form-urlencoded'); }catch(e){} }\n"
+            + "      x.send(body===undefined?null:String(body));\n"
+            + "      if(x.status && (x.status<200 || x.status>=400)) console.log('ajax status '+x.status+' '+u);\n"
+            + "      return x.responseText||'';\n"
+            + "    }catch(e){ console.log('ajax fail: '+e+' '+u); return ''; }\n"
+            + "  }\n"
             + "};\n"
             + "function runJs(code, result){\n"
             + "  try{ var fn=new Function('result','java','baseUrl','source','document','window',code);\n"
