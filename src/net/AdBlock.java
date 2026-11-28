@@ -240,11 +240,14 @@ public class AdBlock {
 				return r;
 			}
 
-			if (!s.contains("/") && !s.contains("*") && !s.contains("?")) {
-				String h = s;
-				if (h.endsWith("^")) h = h.substring(0, h.length() - 1);
-				if (h.isEmpty()) return null;
-				r.key = h.toLowerCase();
+			// 纯主机（含 "example.com"、"{domain}.com^" 这类）与通用子串规则要分开：
+			// 只有形如合法域名的才进主机桶，"-ad-banner." 这类仍走通用正则。
+			String hostCandidate = s;
+			if (hostCandidate.endsWith("^")) hostCandidate = hostCandidate.substring(0, hostCandidate.length() - 1);
+			boolean looksHost = hostCandidate.matches("[a-z0-9][a-z0-9.-]*") && hostCandidate.contains(".")
+				&& !hostCandidate.endsWith(".");
+			if (!s.contains("/") && !s.contains("*") && !s.contains("?") && looksHost) {
+				r.key = hostCandidate.toLowerCase();
 				bucket(r.key).add(r);
 				return r;
 			}
@@ -266,6 +269,14 @@ public class AdBlock {
 			return r;
 		}
 
+		String[] appendArr(String[] old, String v) {
+			if (old == null) return new String[]{v};
+			String[] n = new String[old.length + 1];
+			System.arraycopy(old, 0, n, 0, old.length);
+			n[old.length] = v;
+			return n;
+		}
+
 		List<Net> bucket(String host) {
 			List<Net> l = byHost.get(host);
 			if (l == null) { l = new ArrayList<>(); byHost.put(host, l); }
@@ -284,18 +295,25 @@ public class AdBlock {
 					for (String t : c.split(",")) if (!t.trim().isEmpty()) tokens.add(t.trim());
 				}
 			}
+			boolean inDomain = false;
 			for (String o : tokens) {
 				String t = o.trim();
 				if (t.isEmpty()) continue;
 				boolean neg = false;
 				if (t.startsWith("~")) { neg = true; t = t.substring(1); }
+				// $script,domain=a.com,~b.com 这类写法：domain= 之后的 ~项 归到排除表
+				if (inDomain && neg && t.matches("[a-z0-9.*_-]+")) {
+					r.excDomains = appendArr(r.excDomains, t.toLowerCase());
+					continue;
+				}
 				if (t.equals("third-party") || t.equals("3p")) {
 					if (neg) r.noThirdParty = true; else r.thirdParty = true;
 				} else if (t.startsWith("domain=")) {
+					inDomain = true;
 					String v = t.substring(7);
 					List<String> inc = new ArrayList<>();
 					List<String> exc = new ArrayList<>();
-					for (String dv : v.split("\\|,")) {
+					for (String dv : v.split("[|,]")) {
 						String x = dv.trim();
 						if (x.isEmpty()) continue;
 						if (x.startsWith("~")) exc.add(x.substring(1).toLowerCase());
@@ -325,6 +343,10 @@ public class AdBlock {
 					r.types |= T_OTHER;
 				} else if (t.equals("important") || t.equals("match-case") || t.equals("all")) {
 					// 兼容项
+				} else if (t.startsWith("redirect=") || t.startsWith("csp=") || t.startsWith("removeparam=")
+					|| t.startsWith("rewrite=") || t.startsWith("replace=") || t.startsWith("cookie=")
+					|| t.startsWith("denyallow=") || t.startsWith("method=")) {
+					return true;
 				} else if (t.equals("badfilter") || t.equals("csp") || t.equals("rewrite")
 					|| t.equals("redirect") || t.equals("removeparam") || t.equals("generichide")
 					|| t.equals("elemhide") || t.equals("genericblock") || t.equals("webrtc")
@@ -360,6 +382,10 @@ public class AdBlock {
 		}
 
 		boolean applies(Net r, String url, String pageHost, int type) {
+			// pageHost 允许传整条页面 URL（自检/旧调用方），统一归一成主机名
+			String ph = pageHost == null ? null : pageHost.toLowerCase();
+			if (ph != null && (ph.contains("://") || ph.contains("/"))) ph = host(ph);
+			pageHost = ph;
 			if (r.incDomains != null && !domainHit(pageHost, r.incDomains)) return false;
 			if (r.excDomains != null && domainHit(pageHost, r.excDomains)) return false;
 			if (r.types != 0 && type != 0 && (r.types & type) == 0) return false;
@@ -881,7 +907,9 @@ public class AdBlock {
 			+ "@@/whitelist/\n"
 			+ "news.example##.ad-box\n"
 			+ "news.example#@#.keep-box\n"
-			+ "##.generic-ad\n";
+			+ "##.generic-ad\n"
+			+ "-ad-banner.\n"
+			+ "||dropped.example.com^$redirect=noop.js\n";
 
 	/**
 	 * 离线自检：用内置规则集构造独立引擎，逐条断言匹配结果与元素隐藏输出，
@@ -921,6 +949,13 @@ public class AdBlock {
 		boolean cssOk = css != null && css.contains(".ad-box") && css.contains(".generic-ad") && !css.contains(".keep-box");
 		pass += check(b, total++, "元素隐藏含域规则与例外", cssOk);
 		pass += check(b, total++, "元素隐藏不串域", e.hideCss("other.example") != null && !e.hideCss("other.example").contains(".ad-box"));
+
+		pass += check(b, total++, "子串规则匹配（-ad-banner.）",
+			e.blocked("https://x.example/img-ad-banner.png", "https://x.example/", T_IMAGE));
+		pass += check(b, total++, "带值选项 redirect 整条丢弃",
+			!e.blocked("https://dropped.example.com/s.js", "https://x.example/", T_SCRIPT));
+		pass += check(b, total++, "页面地址传整串 URL 也归一",
+			e.blocked("https://ads.example.com/a.js", "https://news.example/page", T_SCRIPT));
 
 		// 畸形输入不应抛异常
 		Engine bad = new Engine();
