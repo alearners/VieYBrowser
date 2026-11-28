@@ -153,6 +153,14 @@ public class SettingsActivity extends BaseActivity {
 					.show();
 		});
 		
+		addSection("AI 助手");
+		addItem("接口地址（OpenAI 兼容 /v1）", v -> editField("AI 接口地址", AiConfig.baseUrl(this), x -> AiConfig.setBaseUrl(this, x)));
+		addItem("模型", v -> editField("AI 模型", AiConfig.model(this), x -> AiConfig.setModel(this, x)));
+		addItem("API Key", v -> editField("AI API Key", AiConfig.apiKey(this), x -> AiConfig.setApiKey(this, x)));
+		addItem("系统提示词", v -> editField("AI 系统提示词", AiConfig.systemPrompt(this), x -> AiConfig.setSystemPrompt(this, x)));
+		addItem("打开 AI 对话", v -> AiActivity.open(this));
+		addItem("书签导入（HTML / JSON 文件）", v -> pickBookmarkFile());
+		
 		addSection("网页字体");
 		addSwitchItem("网页自定义字体注入（CSP 安全）", FontInject.enabled(this), (v, is) -> FontInject.setEnabled(this, is));
 		textWebFont = addValueItem("网页字体文件 (.ttf/.otf)", v -> pickWebFont());
@@ -162,11 +170,20 @@ public class SettingsActivity extends BaseActivity {
 		addSwitchItem("安全浏览拦截（可疑域名提示页）", SafeBrowse.enabled(this), (v, is) -> SafeBrowse.setEnabled(this, is));
 		addSwitchItem("看图模式（点图放大）", "true".equals(getPrefs(this).getString("image_mode", "false")), (v, is) -> getPrefs(this).edit().putString("image_mode", is ? "true" : "false").apply());
 		addItem("运行日志 / 资源日志", v -> startActivity(new Intent(this, LogActivity.class)));
+		addSwitchItem("虚拟鼠标（单指拖光标 / 点按悬停元素）", VirtualMouse.isOn(this), (v, is) -> {
+			VirtualMouse.setOn(this, is);
+			Toast.makeText(this, is ? "已开启，刷新页面后出现光标" : "已关闭，刷新页面后移除光标", Toast.LENGTH_SHORT).show();
+		});
 		
 		addSection("协议工具");
 		addItem("MQTT 订阅（Paho mqttv3）", v -> startActivity(new Intent(this, MqttActivity.class)));
 		addItem("FTP 目录浏览 / 下载（commons-net）", v -> startActivity(new Intent(this, FtpActivity.class)));
 		addItem("Java 网络代理已启用（页面可用 viek.http）", v -> i.utw("网络代理", "页面脚本可调用 viek.http(url, opts) 经 Java 发起请求，绕同源限制；也可用 viek.fetch。"));
+		addSwitchItem("镜像重定向（仅主框架导航）", MirrorMap.enabled(this), (v, is) -> {
+			MirrorMap.setEnabled(this, is);
+			if (is && MirrorMap.ruleCount(this) == 0) showMirrorDialog();
+		});
+		addItem("镜像规则（" + MirrorMap.ruleCount(this) + " 条）", v -> showMirrorDialog());
 
 		addSection("插件与下载");
 		addItem("用户脚本插件（.user.js 管理 / 脚本市场）", v -> startActivity(new Intent(this, PluginActivity.class)));
@@ -186,6 +203,48 @@ public class SettingsActivity extends BaseActivity {
 		spacer.setLayoutParams(new LinearLayout.LayoutParams(
 		LinearLayout.LayoutParams.MATCH_PARENT, i.dp2px(100)));
 		contentContainer.addView(spacer);
+	}
+	
+	private interface StrCb {
+		void done(String s);
+	}
+	
+	private void editField(String title, String value, StrCb cb) {
+		EditText et = new EditText(this);
+		et.setText(value == null ? "" : value);
+		et.setTextSize(13);
+		et.setSingleLine(false);
+		et.setMinLines(2);
+		new android.app.AlertDialog.Builder(this).setTitle(title)
+			.setView(et)
+			.setPositiveButton("保存", (d, w) -> cb.done(et.getText().toString()))
+			.setNegativeButton("取消", null).show();
+	}
+	
+	private void showMirrorDialog() {
+		EditText et = new EditText(this);
+		et.setText(MirrorMap.rules(this));
+		et.setTextSize(12);
+		et.setMinLines(6);
+		et.setHint("每行一条：源>目标\n如 twitter.com>xcancel.com\n或 https://x.com/>https://xcancel.com/");
+		new android.app.AlertDialog.Builder(this).setTitle("镜像重定向规则")
+			.setView(et)
+			.setPositiveButton("保存", (d, w) -> {
+				MirrorMap.setRules(this, et.getText().toString());
+				Toast.makeText(this, "已保存 " + MirrorMap.ruleCount(this) + " 条规则", Toast.LENGTH_SHORT).show();
+			})
+			.setNegativeButton("取消", null).show();
+	}
+	
+	private void pickBookmarkFile() {
+		Intent it = new Intent(Intent.ACTION_GET_CONTENT);
+		it.setType("*/*");
+		it.addCategory(Intent.CATEGORY_OPENABLE);
+		try {
+			startActivityForResult(Intent.createChooser(it, "选择书签文件"), 4102);
+		} catch (Exception e) {
+			Toast.makeText(this, "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
+		}
 	}
 	
 	private void showPluginMarketDialog() {
@@ -692,6 +751,22 @@ public class SettingsActivity extends BaseActivity {
 				i.twi(R.string.saved);
 			} catch (Exception e) {
 				i.twi(R.string.error_occurred);
+			}
+			return;
+		}
+		if (requestCode == 4102 && resultCode == RESULT_OK && data != null && data.getData() != null) {
+			try (java.io.InputStream in = getContentResolver().openInputStream(data.getData())) {
+				java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+				byte[] buf = new byte[8192];
+				int n;
+				while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
+				String text = new String(bos.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+				BookmarkImport.Result r = BookmarkImport.importText(this, text);
+				Toast.makeText(this, r.added == 0 && r.skipped == 0
+					? "未识别到书签，请确认是浏览器导出的 HTML 或 JSON"
+					: r.text(), Toast.LENGTH_LONG).show();
+			} catch (Exception e) {
+				Toast.makeText(this, "读取失败：" + e.getMessage(), Toast.LENGTH_SHORT).show();
 			}
 			return;
 		}

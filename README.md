@@ -77,6 +77,14 @@ The project is written in Java, supports Android 5.0 (API 21) and above, and tar
 - FTP: directory browsing and single-file download based on Apache Commons Net
 - uTP transport skeleton: BEP-29 header, connection setup, MTU-sized stop-and-wait acknowledgement with retransmission, FIN and RESET, plus a loopback self-test; congestion control and BitTorrent peer state are not implemented
 
+### 2.7 AI and Browsing Aids
+
+- AI assistant: speaks the OpenAI `chat/completions` protocol; endpoint, model, key and system prompt are configurable in Settings; replies stream into the chat view token by token, and tapping a bubble copies its text
+- Page summarisation: the menu entry "AI 总结本页" extracts `document.body.innerText` (truncated at 20000 characters inside the page) and asks the model for bullet points, a short abstract and any explicit figures
+- Virtual mouse: injects a draggable cursor into the page; drag with one finger to move it, tap to dispatch `mousemove` / `mousedown` / `mouseup` / `click` on the hovered element, while two-finger gestures still scroll the page — useful for menus that only appear on hover
+- Bookmark import: parses Netscape bookmark HTML (Chrome / Edge / Firefox / Safari exports) and JSON (plain arrays, `bookmarks` wrappers and the app's own export structure); imported items land in a dated folder and duplicate URLs are skipped
+- Mirror rewriting: `source>target` rules rewrite main-frame navigations, either by host name or by whole prefix; subresource requests are left untouched
+
 ---
 
 ## 3. Protocol Support

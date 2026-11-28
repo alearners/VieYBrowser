@@ -478,6 +478,7 @@ public class WebViey extends WebView {
 			@Override
 			public void onPageFinished(WebView view, String url) {
 				injectJs();
+				if (VirtualMouse.isOn(getContext())) view.evaluateJavascript(VirtualMouse.SCRIPT, null);
 				if (!i.canRun(url)) {
 					FontInject.inject(view, url);
 					VieAsset.inject(view, url, "viey-bridge.js");
@@ -500,6 +501,7 @@ public class WebViey extends WebView {
 			@Override
 			public boolean shouldOverrideUrlLoading(WebView view, String url) {
 				murl = null;
+				url = MirrorMap.rewrite(getContext(), url);
 				if (i.canRun(url)) {
 					runUrl(url);
 					return true;

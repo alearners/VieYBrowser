@@ -77,6 +77,14 @@ VieY 浏览器是一款面向 smolnet 协议的开源安卓浏览器，由呆毛
 - FTP：基于 Apache Commons Net，支持目录浏览与单文件下载
 - uTP 传输骨架：实现 BEP-29 头部、建链、按 MTU 切片停等确认与重传、FIN 与 RESET，并提供环回自检；暂未实现拥塞控制与 BitTorrent 节点状态机
 
+### 2.7 AI 与浏览辅助
+
+- AI 助手：兼容 OpenAI `chat/completions` 协议，可在设置页填写接口地址、模型、密钥与系统提示词；对话页按流式响应逐字上屏，气泡点按可复制
+- 网页总结：菜单「AI 总结本页」抽取 `document.body.innerText`（页面侧截断 20000 字符）后按预设提示输出要点、概括与数据罗列
+- 虚拟鼠标：页面内注入可拖动光标，单指拖动移动光标、单指点按对命中元素派发 `mousemove` / `mousedown` / `mouseup` / `click`，双指滑动仍交给页面滚动，用于触发只能悬停到达的菜单
+- 书签导入：解析 Netscape bookmark HTML（Chrome / Edge / Firefox / Safari 导出格式）与 JSON（数组、`bookmarks` 包装、本应用导出结构），统一挂到「导入 日期」文件夹，重复 URL 跳过
+- 镜像重定向：按 `源>目标` 规则改写主框架导航，支持主机名替换与前缀整体替换，子资源请求不改写
+
 ---
 
 ## 三、协议支持

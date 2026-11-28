@@ -1157,6 +1157,14 @@ public class MainActivity extends BaseActivity {
 			startActivityForResult(intent,1003);
 			bottomSheetDialog.dismiss();
 		}));
+		menuList.add(new MenuGridItem(R.drawable.ic_search, "AI 总结本页", ()->{
+			bottomSheetDialog.dismiss();
+			aiSummarizePage();
+		}));
+		menuList.add(new MenuGridItem(R.drawable.ic_copy, "AI 对话", ()->{
+			bottomSheetDialog.dismiss();
+			AiActivity.open(MainActivity.this);
+		}));
 		menuList.add(new MenuGridItem(R.drawable.ic_search, getString(R.string.page_search), ()->{
 			bottomSheetDialog.dismiss();
 			MainUtil.openPageSearch(MainActivity.this, isDarkMode, getCurrentWeb(), "");
@@ -1177,6 +1185,39 @@ public class MainActivity extends BaseActivity {
 		}
 	}
 	
+	/**
+	 * 取当前页面可见正文并交给 AI 总结。
+	 *
+	 * 取的是 document.body.innerText，已排除脚本与隐藏节点；长度在页面侧截断，
+	 * 避免大页面把 IPC 字符串撑爆。
+	 */
+	private void aiSummarizePage() {
+		WebViey web = getCurrentWeb();
+		if (web == null || web.getUrl() == null) {
+			Toast.makeText(this, "当前没有可用页面", Toast.LENGTH_SHORT).show();
+			return;
+		}
+		final String url = web.getUrl();
+		final String title = web.getTitle();
+		web.evaluateJavascript(
+			"(function(){try{var b=document.body?document.body.innerText:'';"
+				+ "return b?b.substring(0,20000):''}catch(e){return ''}})()",
+			value -> {
+				String text = value;
+				try {
+					Object o = new org.json.JSONTokener(value).nextValue();
+					if (o instanceof String) text = (String) o;
+				} catch (Exception ignore) {
+					// 非字符串返回值（如 null）按原始文本处理
+				}
+				if (text == null || text.trim().isEmpty()) {
+					Toast.makeText(this, "未取到正文，页面可能仍在加载", Toast.LENGTH_SHORT).show();
+					return;
+				}
+				AiActivity.summarize(this, title, url, text);
+			});
+	}
+
 	private void toggleNightMode() {
 		isDarkMode = !isDarkMode;
 		VieYApp.setDarkMode(this, isDarkMode);
