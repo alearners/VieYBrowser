@@ -145,7 +145,7 @@ VieY 浏览器是一款面向 smolnet 协议的开源安卓浏览器，由呆毛
 
 产物位于 `build/outputs/apk/`。发布包使用仓库内 `keystore/viey-release.jks` 签名，签名口令可通过环境变量 `VIEY_STORE_PASS`、`VIEY_KEY_ALIAS`、`VIEY_KEY_PASS` 覆盖。
 
-持续集成配置位于 `.github/workflows/build.yml`，推送至 `main` 或 `dev/**` 分支时自动构建发布包与调试包，并校验签名。
+持续集成配置位于 `.github/workflows/build.yml`，推送至 `main`、`feature/**` 或 `fix/**` 分支时自动构建发布包与调试包，并校验签名。
 
 ### 5.2 项目结构
 
