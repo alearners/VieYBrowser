@@ -6,7 +6,7 @@
 
 - 项目主页：<https://palhube666.wodemo.net/>
 - 下载地址：[蓝奏云](https://dmpap.lanzouw.com/b02dc84ch) · [123 云盘](https://www.123pan.com/s/UML9jv-fk4bh.html) · [Telegram](https://t.me/Kawaii_V)
-- 当前版本：0.11.4-dev，安装包约 3.2 MB
+- 当前版本：0.11.5-dev，安装包约 2.3 MB
 
 ---
 
@@ -111,7 +111,7 @@ VieY 浏览器是一款面向 smolnet 协议的开源安卓浏览器，由呆毛
 
 | 对比项 | VieY | Vie | Lagrange | Zapri | portal.mozz.us |
 |---|---|---|---|---|---|
-| 体积 | 约 3.2 MB | 约 5 MB | 约 20 MB | 约 20 MB | 无需安装 |
+| 体积 | 约 2.3 MB | 约 5 MB | 约 20 MB | 约 20 MB | 无需安装 |
 | 平台 | 安卓 | 安卓 | 多平台 | 安卓 | 多平台 |
 | 身份证书 | 支持 `.bks`、`.p12`、`.pem`、`.crt/.key` | 支持 `.bks`、`.p12` | 支持 `.pem` | 不支持 | 支持 `.pem` |
 | 多语言 | 简体中文、繁体中文、英语 | 简体中文 | 多语言（中文显示异常） | 英语 | 英语 |

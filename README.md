@@ -6,7 +6,7 @@ English | [简体中文](README_zh.md)
 
 - Project page: <https://palhube666.wodemo.net/>
 - Downloads: [Lanzou Cloud](https://dmpap.lanzouw.com/b02dc84ch) · [123 Cloud](https://www.123pan.com/s/UML9jv-fk4bh.html) · [Telegram](https://t.me/Kawaii_V)
-- Current version: 0.11.4-dev, package size approximately 3.2 MB
+- Current version: 0.11.5-dev, package size approximately 2.3 MB
 
 ---
 
@@ -111,7 +111,7 @@ For broader protocol coverage such as `rtsp://`, `sftp://`, `webdav://` or `irc:
 
 | Item | VieY | Vie | Lagrange | Zapri | portal.mozz.us |
 |---|---|---|---|---|---|
-| Size | ~3.2 MB | ~5 MB | ~20 MB | ~20 MB | No install |
+| Size | ~2.3 MB | ~5 MB | ~20 MB | ~20 MB | No install |
 | Platform | Android | Android | Multi-platform | Android | Multi-platform |
 | Identity certificates | `.bks`, `.p12`, `.pem`, `.crt/.key` | `.bks`, `.p12` | `.pem` | Not supported | `.pem` |
 | Languages | Simplified Chinese, Traditional Chinese, English | Simplified Chinese | Multiple (Chinese rendering broken) | English | English |
