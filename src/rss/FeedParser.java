@@ -67,6 +67,14 @@ public class FeedParser {
      * 主要用于源仓库/目录型网页，条目少于 3 条则不采用，避免把导航页当订阅。
      */
     public static List<Article> parseAnchors(String body, String baseUrl) {
+        return parseAnchors(body, baseUrl, false);
+    }
+
+    /**
+     * 从纯链接页面兜底提取条目。sameHostOnly=false 时允许跨域（导航页/发布页常见），
+     * 但会丢掉 #、javascript、以及纯功能链接。
+     */
+    public static List<Article> parseAnchors(String body, String baseUrl, boolean allowCrossHost) {
         List<Article> out = new ArrayList<>();
         if (body == null) return out;
         String baseHost = hostOf(baseUrl);
@@ -78,7 +86,7 @@ public class FeedParser {
                 if (href.isEmpty()) href = a.attr("href");
                 String low = href.toLowerCase();
                 if (low.startsWith("javascript:") || low.startsWith("mailto:") || low.startsWith("#") || low.isEmpty()) continue;
-                if (baseHost != null && !hostOf(href).endsWith(baseHost)) continue;
+                if (!allowCrossHost && baseHost != null && !baseHost.isEmpty() && !hostOf(href).endsWith(baseHost)) continue;
                 String text = a.text().trim();
                 if (text.length() < 6) continue;
                 if (seen.contains(href)) continue;

@@ -135,6 +135,7 @@ public class FeedRepo {
 
     /** 一次抓取的结果，供刷新与「规则测试」共用 */
     public static class FetchResult {
+        public String hint = "";
         public int bytes;
         public int rendered;
         public String mode = "静态";
@@ -159,21 +160,35 @@ public class FeedRepo {
             && (hasJs || FeedParser.looksLikeSpa(body) || RuleJs.needed(s));
         if (tryRender) {
             String html = RuleJs.render(c, s, s.url);
+            r.mode = "WebView 渲染";
             if (html != null && html.length() > 0) {
                 r.rendered = html.length();
                 r.body = html;
                 r.items = FeedParser.parse(c, html, s, s.url);
-                r.mode = "WebView 渲染";
+            } else {
+                r.mode = "WebView 渲染(取不到页面)";
             }
         }
         if (r.items.isEmpty() && TextUtils.isEmpty(s.ruleArticles) && TextUtils.isEmpty(s.ruleTitle)) {
             List<FeedParser.Article> anchors = FeedParser.parseAnchors(r.body, s.url);
+            if (anchors.isEmpty()) anchors = FeedParser.parseAnchors(r.body, s.url, true);
             if (!anchors.isEmpty()) {
                 r.items = anchors;
                 r.mode = r.mode + " + 链接兜底";
             }
         }
+        r.hint = diagnose(s, r);
         return r;
+    }
+
+    /** 抓不到条目时给一句可执行的建议，而不是让用户自己猜 */
+    private static String diagnose(FeedSource s, FetchResult r) {
+        if (!r.items.isEmpty()) return "";
+        boolean noRule = TextUtils.isEmpty(s.ruleArticles) && TextUtils.isEmpty(s.ruleTitle);
+        if (r.body.contains("id=\"root\"") || r.body.contains("id=\"app\""))
+            return "该地址是前端框架动态页（SPA），正文由 JS 渲染；请在源里填 preloadJs/injectJs 或用 @js 规则，必要时需登录";
+        if (noRule) return "该地址不含 RSS/Atom，也没有列表结构；请填栏目规则 ruleArticles，或换成该站真正的 RSS 地址";
+        return "规则没匹配到条目：检查 ruleArticles 的 CSS 选择器，或改成 @js: 脚本规则";
     }
 
     /** 抓一个源并写缓存；返回抓到的条数，异常向上抛 */
@@ -182,7 +197,8 @@ public class FeedRepo {
         List<FeedParser.Article> items = r.items;
         if (items.isEmpty()) {
             throw new Exception("解析不到条目（" + r.mode + "，" + r.bytes + " 字节"
-                + (r.rendered > 0 ? " / 渲染 " + r.rendered : "") + "）：检查栏目规则或地址");
+                + (r.rendered > 0 ? " / 渲染 " + r.rendered : "") + "）\n"
+                + (r.hint.isEmpty() ? "检查栏目规则或地址" : r.hint));
         }
         for (FeedParser.Article a : items) a.source = s.displayTitle();
         saveItems(c, s, items);

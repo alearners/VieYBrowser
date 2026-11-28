@@ -183,22 +183,78 @@ public class RuleJs {
         final CountDownLatch latch = new CountDownLatch(1);
         final Handler ui = new Handler(Looper.getMainLooper());
         final String inject = buildInject(src);
-        final long settleMs = 1800L;
-        ui.post(() -> {
-            WebView wv = null;
-            try {
-                wv = new WebView(c.getApplicationContext());
-                WebSettings ws = wv.getSettings();
-                ws.setJavaScriptEnabled(true);
-                ws.setBlockNetworkLoads(false);
-                ws.setAllowFileAccess(false);
-                ws.setAllowUniversalAccessFromFileURLs(true);
-                ws.setAllowFileAccessFromFileURLs(true);
-                ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-                ws.setDomStorageEnabled(true);
-                ws.setDatabaseEnabled(true);
-                final WebView fwv = wv;
-                final boolean[] done = {false};
+        final long settleMs = 1200L;
+        final long maxMs = 12000L;
+        final android.app.Activity act = activityOf(c);
+        ui.post(new Runnable() {
+            @Override public void run() {
+                final WebView wv;
+                try {
+                    wv = new WebView(act != null ? act : c.getApplicationContext());
+                } catch (Throwable t) {
+                    android.util.Log.w("viey-rulejs", "渲染启动失败：" + t);
+                    latch.countDown();
+                    return;
+                }
+                try {
+                    WebSettings ws = wv.getSettings();
+                    ws.setJavaScriptEnabled(true);
+                    ws.setBlockNetworkLoads(false);
+                    ws.setAllowFileAccess(false);
+                    ws.setAllowUniversalAccessFromFileURLs(true);
+                    ws.setAllowFileAccessFromFileURLs(true);
+                    ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                    ws.setDomStorageEnabled(true);
+                    ws.setDatabaseEnabled(true);
+                    ws.setJavaScriptCanOpenWindowsAutomatically(false);
+                } catch (Throwable ignored) {}
+
+                // 离屏挂载：部分 WebView 不附着窗口时一直停在 loading，onPageFinished 不回调
+                if (act != null) {
+                    try {
+                        act.addContentView(wv, new android.view.ViewGroup.LayoutParams(1, 1));
+                        wv.setAlpha(0f);
+                        wv.setTranslationX(-80f);
+                        wv.setTranslationY(-80f);
+                    } catch (Throwable t) {
+                        android.util.Log.w("viey-rulejs", "挂载失败：" + t);
+                    }
+                }
+
+                final boolean[] finished = {false};
+                final long t0 = System.currentTimeMillis();
+                final Runnable capture = new Runnable() {
+                    @Override public void run() {
+                        if (finished[0]) return;
+                        finished[0] = true;
+                        try {
+                            wv.evaluateJavascript(
+                                "(function(){try{return document.documentElement.outerHTML.substring(0,3000000);}catch(e){return '';}})()",
+                                value -> {
+                                    try {
+                                        String html = value == null ? "" : value;
+                                        if (html.startsWith("\"")) html = new org.json.JSONTokener(html).nextValue().toString();
+                                        out.append(html);
+                                    } catch (Throwable t) {
+                                        android.util.Log.w("viey-rulejs", "渲染结果解析失败：" + t);
+                                    } finally {
+                                        teardown(wv, latch);
+                                    }
+                                });
+                        } catch (Throwable t) {
+                            teardown(wv, latch);
+                        }
+                    }
+                };
+
+                wv.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public void onPageFinished(WebView view, String u) {
+                        android.util.Log.i("viey-rulejs", "onPageFinished 渲染页");
+                        try { if (!inject.isEmpty()) view.evaluateJavascript(inject, null); } catch (Throwable ignored) {}
+                        view.postDelayed(capture, settleMs);
+                    }
+                });
                 wv.setWebChromeClient(new android.webkit.WebChromeClient() {
                     @Override
                     public boolean onConsoleMessage(android.webkit.ConsoleMessage m) {
@@ -206,51 +262,66 @@ public class RuleJs {
                         return true;
                     }
                 });
-                wv.setWebViewClient(new WebViewClient() {
-                    @Override
-                    public void onPageFinished(WebView view, String u) {
-                        if (done[0]) return;
-                        done[0] = true;
+
+                // 不依赖 onPageFinished：轮询 readyState，complete 且已跑过 1s 就再等 settle 抓取
+                final Runnable poll = new Runnable() {
+                    @Override public void run() {
+                        if (finished[0]) return;
+                        final long el = System.currentTimeMillis() - t0;
+                        if (el >= maxMs) { capture.run(); return; }
                         try {
-                            if (!inject.isEmpty()) view.evaluateJavascript(inject, null);
-                        } catch (Throwable ignored) {}
-                        view.postDelayed(() -> {
-                            try {
-                                view.evaluateJavascript(
-                                    "(function(){try{return document.documentElement.outerHTML.substring(0,3000000);}catch(e){return '';}})()",
-                                    value -> {
-                                        try {
-                                            String html = value == null ? "" : value;
-                                            if (html.startsWith("\"")) {
-                                                html = new org.json.JSONTokener(html).nextValue().toString();
-                                            }
-                                            out.append(html);
-                                        } catch (Throwable t) {
-                                            android.util.Log.w("viey-rulejs", "渲染结果解析失败：" + t);
-                                        } finally {
-                                            latch.countDown();
-                                            try { fwv.destroy(); } catch (Throwable ignored) {}
-                                        }
-                                    });
-                            } catch (Throwable t) {
-                                latch.countDown();
-                            }
-                        }, settleMs);
+                            wv.evaluateJavascript("(document.readyState||'')",
+                                v -> {
+                                    if (finished[0]) return;
+                                    android.util.Log.i("viey-rulejs", "轮询 " + (System.currentTimeMillis() - t0) + "ms state=" + v);
+                                    if (v != null && v.contains("complete") && el > 1000) {
+                                        wv.postDelayed(capture, settleMs);
+                                    } else {
+                                        wv.postDelayed(this, 800L);
+                                    }
+                                });
+                        } catch (Throwable t) {
+                            wv.postDelayed(this, 800L);
+                        }
                     }
-                });
-                wv.loadUrl(url);
-                android.util.Log.i("viey-rulejs", "render 开始 url=" + url);
-            } catch (Throwable t) {
-                android.util.Log.w("viey-rulejs", "渲染启动失败：" + t);
-                latch.countDown();
+                };
+
+                try {
+                    wv.loadUrl(url);
+                    android.util.Log.i("viey-rulejs", "render 开始 url=" + url);
+                    wv.postDelayed(poll, 700L);
+                    wv.postDelayed(capture, maxMs);
+                } catch (Throwable t) {
+                    android.util.Log.w("viey-rulejs", "渲染启动失败：" + t);
+                    teardown(wv, latch);
+                }
             }
         });
         try {
-            if (!latch.await(30, TimeUnit.SECONDS)) android.util.Log.w("viey-rulejs", "渲染超时：" + url);
+            if (!latch.await(20, TimeUnit.SECONDS)) android.util.Log.w("viey-rulejs", "渲染超时：" + url);
         } catch (InterruptedException ignored) {
         }
         android.util.Log.i("viey-rulejs", "render 完成 长度 " + out.length());
         return out.toString();
+    }
+
+    private static void teardown(WebView wv, CountDownLatch latch) {
+        latch.countDown();
+        try {
+            android.view.ViewParent p = wv.getParent();
+            if (p instanceof android.view.ViewGroup) ((android.view.ViewGroup) p).removeView(wv);
+        } catch (Throwable ignored) {}
+        try { wv.destroy(); } catch (Throwable ignored) {}
+    }
+
+    /** 从包装 Context 里找 Activity，用于把离屏 WebView 挂到窗口上 */
+    private static android.app.Activity activityOf(Context c) {
+        Context x = c;
+        while (x instanceof android.content.ContextWrapper) {
+            if (x instanceof android.app.Activity) return (android.app.Activity) x;
+            x = ((android.content.ContextWrapper) x).getBaseContext();
+        }
+        return null;
     }
 
     private static String buildInject(FeedSource s) {
