@@ -150,9 +150,12 @@ public class FeedEditActivity extends BaseActivity {
         new Thread(() -> {
             StringBuilder sb = new StringBuilder();
             try {
-                String body = FeedRepo.fetch(this, src.url, src);
-                sb.append("页面 ").append(body.length()).append(" 字节\n");
-                List<FeedParser.Article> list = FeedParser.parse(body, src, src.url);
+                FeedRepo.FetchResult res = FeedRepo.load(this, src);
+                String body = res.body;
+                sb.append("抓取 ").append(res.bytes).append(" 字节，方式：").append(res.mode);
+                if (res.rendered > 0) sb.append("（渲染后 ").append(res.rendered).append(" 字节）");
+                sb.append("\n");
+                List<FeedParser.Article> list = res.items;
                 sb.append("解析到 ").append(list.size()).append(" 条\n\n");
                 for (int i = 0; i < Math.min(5, list.size()); i++) {
                     FeedParser.Article a = list.get(i);

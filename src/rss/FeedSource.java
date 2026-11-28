@@ -12,6 +12,8 @@ public class FeedSource {
     public String group = "";
     public String header = "";          // JSON 对象字符串
     public String jsLib = "";
+    public String preloadJs = "";
+    public String injectJs = "";
     public String ruleArticles = "";
     public String ruleTitle = "";
     public String ruleLink = "";
@@ -31,6 +33,8 @@ public class FeedSource {
         s.group = opt3(o, "rssSourceGroup", "sourceGroup", "group");
         s.header = opt(o, "header", "header", "");
         s.jsLib = opt(o, "jsLib", "jsLib", "");
+        s.preloadJs = opt(o, "preloadJs", "preloadJs", "");
+        s.injectJs = opt(o, "injectJs", "injectJs", "");
         s.ruleArticles = opt(o, "ruleArticles", "ruleArticles", "");
         s.ruleTitle = opt(o, "ruleTitle", "ruleTitle", "");
         s.ruleLink = opt(o, "ruleLink", "ruleLink", "");
@@ -52,6 +56,8 @@ public class FeedSource {
         put(o, "rssSourceGroup", group);
         put(o, "header", header);
         put(o, "jsLib", jsLib);
+        put(o, "preloadJs", preloadJs);
+        put(o, "injectJs", injectJs);
         put(o, "ruleArticles", ruleArticles);
         put(o, "ruleTitle", ruleTitle);
         put(o, "ruleLink", ruleLink);

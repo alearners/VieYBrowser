@@ -133,11 +133,57 @@ public class FeedRepo {
         return n;
     }
 
+    /** 一次抓取的结果，供刷新与「规则测试」共用 */
+    public static class FetchResult {
+        public int bytes;
+        public int rendered;
+        public String mode = "静态";
+        public String body = "";
+        public List<FeedParser.Article> items = new ArrayList<>();
+    }
+
+    /**
+     * 抓取 + 解析：静态 HTML 解析不出来时，若页面像 SPA 或源里带了 preloadJs/injectJs，
+     * 用离屏 WebView 渲染后再解析；仍为空且没有规则时，退回「同域链接」兜底。
+     */
+    public static FetchResult load(Context c, FeedSource s) throws Exception {
+        FetchResult r = new FetchResult();
+        String body = fetch(c, s.url, s);
+        r.bytes = body.length();
+        r.body = body;
+        r.items = FeedParser.parse(c, body, s, s.url);
+
+        boolean hasJs = s.preloadJs != null && !s.preloadJs.trim().isEmpty()
+            || s.injectJs != null && !s.injectJs.trim().isEmpty();
+        boolean tryRender = r.items.isEmpty() && RuleJs.enabled(c)
+            && (hasJs || FeedParser.looksLikeSpa(body) || RuleJs.needed(s));
+        if (tryRender) {
+            String html = RuleJs.render(c, s, s.url);
+            if (html != null && html.length() > 0) {
+                r.rendered = html.length();
+                r.body = html;
+                r.items = FeedParser.parse(c, html, s, s.url);
+                r.mode = "WebView 渲染";
+            }
+        }
+        if (r.items.isEmpty() && TextUtils.isEmpty(s.ruleArticles) && TextUtils.isEmpty(s.ruleTitle)) {
+            List<FeedParser.Article> anchors = FeedParser.parseAnchors(r.body, s.url);
+            if (!anchors.isEmpty()) {
+                r.items = anchors;
+                r.mode = r.mode + " + 链接兜底";
+            }
+        }
+        return r;
+    }
+
     /** 抓一个源并写缓存；返回抓到的条数，异常向上抛 */
     public static int refresh(Context c, FeedSource s) throws Exception {
-        String body = fetch(c, s.url, s);
-        List<FeedParser.Article> items = FeedParser.parse(c, body, s, s.url);
-        if (items.isEmpty()) throw new Exception("解析不到条目（检查栏目规则或地址）");
+        FetchResult r = load(c, s);
+        List<FeedParser.Article> items = r.items;
+        if (items.isEmpty()) {
+            throw new Exception("解析不到条目（" + r.mode + "，" + r.bytes + " 字节"
+                + (r.rendered > 0 ? " / 渲染 " + r.rendered : "") + "）：检查栏目规则或地址");
+        }
         for (FeedParser.Article a : items) a.source = s.displayTitle();
         saveItems(c, s, items);
         s.lastUpdate = System.currentTimeMillis();

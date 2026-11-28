@@ -172,6 +172,98 @@ public class RuleJs {
         return out;
     }
 
+    /**
+     * 用离屏 WebView 直接打开页面（执行页面自己的 JS），可选注入 jsLib / preloadJs / injectJs，
+     * 等页面稳定后回传渲染后的 outerHTML。用于 SPA、需要登录/脚本的源。
+     * 调用方必须位于工作线程。失败返回空串。
+     */
+    public static String render(Context c, FeedSource src, String url) {
+        if (url == null || url.isEmpty()) return "";
+        final StringBuilder out = new StringBuilder();
+        final CountDownLatch latch = new CountDownLatch(1);
+        final Handler ui = new Handler(Looper.getMainLooper());
+        final String inject = buildInject(src);
+        final long settleMs = 1800L;
+        ui.post(() -> {
+            WebView wv = null;
+            try {
+                wv = new WebView(c.getApplicationContext());
+                WebSettings ws = wv.getSettings();
+                ws.setJavaScriptEnabled(true);
+                ws.setBlockNetworkLoads(false);
+                ws.setAllowFileAccess(false);
+                ws.setAllowUniversalAccessFromFileURLs(true);
+                ws.setAllowFileAccessFromFileURLs(true);
+                ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                ws.setDomStorageEnabled(true);
+                ws.setDatabaseEnabled(true);
+                final WebView fwv = wv;
+                final boolean[] done = {false};
+                wv.setWebChromeClient(new android.webkit.WebChromeClient() {
+                    @Override
+                    public boolean onConsoleMessage(android.webkit.ConsoleMessage m) {
+                        android.util.Log.i("viey-rulejs-js", m.message() + " @" + m.lineNumber());
+                        return true;
+                    }
+                });
+                wv.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public void onPageFinished(WebView view, String u) {
+                        if (done[0]) return;
+                        done[0] = true;
+                        try {
+                            if (!inject.isEmpty()) view.evaluateJavascript(inject, null);
+                        } catch (Throwable ignored) {}
+                        view.postDelayed(() -> {
+                            try {
+                                view.evaluateJavascript(
+                                    "(function(){try{return document.documentElement.outerHTML.substring(0,3000000);}catch(e){return '';}})()",
+                                    value -> {
+                                        try {
+                                            String html = value == null ? "" : value;
+                                            if (html.startsWith("\"")) {
+                                                html = new org.json.JSONTokener(html).nextValue().toString();
+                                            }
+                                            out.append(html);
+                                        } catch (Throwable t) {
+                                            android.util.Log.w("viey-rulejs", "渲染结果解析失败：" + t);
+                                        } finally {
+                                            latch.countDown();
+                                            try { fwv.destroy(); } catch (Throwable ignored) {}
+                                        }
+                                    });
+                            } catch (Throwable t) {
+                                latch.countDown();
+                            }
+                        }, settleMs);
+                    }
+                });
+                wv.loadUrl(url);
+                android.util.Log.i("viey-rulejs", "render 开始 url=" + url);
+            } catch (Throwable t) {
+                android.util.Log.w("viey-rulejs", "渲染启动失败：" + t);
+                latch.countDown();
+            }
+        });
+        try {
+            if (!latch.await(30, TimeUnit.SECONDS)) android.util.Log.w("viey-rulejs", "渲染超时：" + url);
+        } catch (InterruptedException ignored) {
+        }
+        android.util.Log.i("viey-rulejs", "render 完成 长度 " + out.length());
+        return out.toString();
+    }
+
+    private static String buildInject(FeedSource s) {
+        if (s == null) return "";
+        StringBuilder b = new StringBuilder();
+        b.append("(function(){try{");
+        if (s.jsLib != null && !s.jsLib.trim().isEmpty()) b.append(s.jsLib).append("\n");
+        if (s.preloadJs != null && !s.preloadJs.trim().isEmpty()) b.append(s.preloadJs).append("\n");
+        if (s.injectJs != null && !s.injectJs.trim().isEmpty()) b.append(s.injectJs).append("\n");
+        b.append("}catch(e){}})();");
+        return b.toString();
+    }
+
     public static String lastError = "";
 
     private static void collect(String value, List<FeedParser.Article> out) throws org.json.JSONException {

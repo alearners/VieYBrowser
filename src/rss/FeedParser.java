@@ -62,6 +62,58 @@ public class FeedParser {
         return new ArrayList<>();
     }
 
+    /**
+     * 兜底：页面没有规则、也不是 RSS 时，把同域下文字够长的链接当成条目。
+     * 主要用于源仓库/目录型网页，条目少于 3 条则不采用，避免把导航页当订阅。
+     */
+    public static List<Article> parseAnchors(String body, String baseUrl) {
+        List<Article> out = new ArrayList<>();
+        if (body == null) return out;
+        String baseHost = hostOf(baseUrl);
+        try {
+            Document doc = Jsoup.parse(body, baseUrl == null ? "" : baseUrl);
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            for (Element a : doc.select("a[href]")) {
+                String href = a.absUrl("href");
+                if (href.isEmpty()) href = a.attr("href");
+                String low = href.toLowerCase();
+                if (low.startsWith("javascript:") || low.startsWith("mailto:") || low.startsWith("#") || low.isEmpty()) continue;
+                if (baseHost != null && !hostOf(href).endsWith(baseHost)) continue;
+                String text = a.text().trim();
+                if (text.length() < 6) continue;
+                if (seen.contains(href)) continue;
+                seen.add(href);
+                Article x = new Article();
+                x.title = text;
+                x.link = href;
+                out.add(x);
+                if (out.size() >= 80) break;
+            }
+        } catch (Throwable ignored) {
+        }
+        return out.size() >= 3 ? out : new ArrayList<>();
+    }
+
+    private static String hostOf(String url) {
+        try {
+            java.net.URL u = new java.net.URL(url);
+            String h = u.getHost();
+            return h == null ? "" : h.toLowerCase();
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    /** 看起来是 JS 渲染的空壳页（内容由前端框架填充） */
+    public static boolean looksLikeSpa(String body) {
+        if (body == null) return false;
+        String low = body.toLowerCase(Locale.ROOT);
+        int anchors = low.split("<a ").length - 1;
+        if (anchors >= 6) return false;
+        return low.contains("id=\"app\"") || low.contains("id='app'")
+            || (low.contains("<script") && body.length() < 70000 && anchors <= 2);
+    }
+
     // ---------------- XML ----------------
 
     private static List<Article> parseXml(String body) {
