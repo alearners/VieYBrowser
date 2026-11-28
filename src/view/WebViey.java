@@ -463,6 +463,8 @@ public class WebViey extends WebView {
 					if (r != null) return r;
 					r = VieAsset.intercept(getContext(), request);
 					if (r != null) return r;
+					r = AdBlock.intercept(getContext(), request);
+					if (r != null) return r;
 					if (request != null && request.getUrl() != null && request.isForMainFrame()) {
 						String u = request.getUrl().toString();
 						if (!u.equals(lastJournalUrl)) {

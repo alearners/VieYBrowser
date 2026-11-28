@@ -26,9 +26,9 @@ public class FeedSource {
 
     public static FeedSource fromLegado(JSONObject o) {
         FeedSource s = new FeedSource();
-        s.name = opt(o, "rssSourceName", "name", "");
-        s.url = opt(o, "rssSourceUrl", "url", "");
-        s.group = opt(o, "rssSourceGroup", "group", "");
+        s.name = opt3(o, "rssSourceName", "sourceName", "name");
+        s.url = opt3(o, "rssSourceUrl", "sourceUrl", "url");
+        s.group = opt3(o, "rssSourceGroup", "sourceGroup", "group");
         s.header = opt(o, "header", "header", "");
         s.jsLib = opt(o, "jsLib", "jsLib", "");
         s.ruleArticles = opt(o, "ruleArticles", "ruleArticles", "");
@@ -39,7 +39,7 @@ public class FeedSource {
         s.ruleImage = opt(o, "ruleImage", "ruleImage", "");
         s.ruleContent = opt(o, "ruleContent", "ruleContent", "");
         s.ruleNextPage = opt(o, "ruleNextPage", "ruleNextPage", "");
-        s.icon = opt(o, "rssSourceIcon", "icon", "");
+        s.icon = opt3(o, "rssSourceIcon", "sourceIcon", "icon");
         s.enabled = !o.has("enabled") || o.optBoolean("enabled", true);
         s.lastUpdate = o.optLong("lastUpdate", 0L);
         return s;
@@ -84,6 +84,14 @@ public class FeedSource {
             o.put(k, v == null ? "" : v);
         } catch (Exception ignored) {
         }
+    }
+
+    /** 兼容阅读 3.x（rssSourceName）与新式订阅源（sourceName）两套字段名 */
+    private static String opt3(JSONObject o, String a, String b, String c) {
+        String v = o.optString(a, null);
+        if (v == null || v.length() == 0) v = o.optString(b, null);
+        if (v == null || v.length() == 0) v = o.optString(c, "");
+        return v == null ? "" : v;
     }
 
     private static String opt(JSONObject o, String a, String b, String def) {

@@ -45,6 +45,7 @@ public class FeedItemsActivity extends BaseActivity {
     private FeedSource src;
     private boolean allMode, favMode;
     private final Handler ui = new Handler(Looper.getMainLooper());
+    private boolean compact = false;
 
     @Override
     protected void onResume() {
@@ -65,6 +66,8 @@ public class FeedItemsActivity extends BaseActivity {
         TextView title = findViewById(R.id.feed_title);
         findViewById(R.id.back_tool).setOnClickListener(v -> finish());
         findViewById(R.id.feed_refresh).setOnClickListener(v -> load());
+        compact = "true".equals(getPrefs(this).getString("rss_list_compact", "false"));
+        findViewById(R.id.feed_more).setOnClickListener(v -> showRssMenu());
 
         allMode = getIntent().getBooleanExtra(EXTRA_ALL, false);
         favMode = getIntent().getBooleanExtra(EXTRA_FAVS, false);
@@ -110,6 +113,7 @@ public class FeedItemsActivity extends BaseActivity {
                 t.setText(TextUtils.isEmpty(a.title) ? a.link : a.title);
                 t.setAlpha(FeedState.isRead(FeedItemsActivity.this, a.link) ? 0.55f : 1f);
                 sub.setText(a.subtitle());
+                sub.setVisibility(compact ? View.GONE : View.VISIBLE);
                 return v;
             }
         };
@@ -236,4 +240,138 @@ public class FeedItemsActivity extends BaseActivity {
         }).start();
     }
 
+
+    // ===== RSS 浏览菜单（可自定义，参照阅读的三点菜单）=====
+    private static final String P_MENU_OFF = "rss_menu_off";
+
+    private String[] menuIds() {
+        return new String[]{"resort", "vars", "edit", "layout", "clear"};
+    }
+
+    private String[] menuLabels() {
+        return new String[]{"重新整理分类", "设定源变量", "编辑源", "切换布局（紧凑/常规）", "清除本列表缓存"};
+    }
+
+    private boolean isMenuOn(String id) {
+        String off = getPrefs(this).getString(P_MENU_OFF, "");
+        return !("," + off + ",").contains("," + id + ",");
+    }
+
+    private void showRssMenu() {
+        final String[] ids = menuIds();
+        final String[] labels = menuLabels();
+        java.util.List<String> shown = new java.util.ArrayList<>();
+        final java.util.List<String> keys = new java.util.ArrayList<>();
+        for (int k = 0; k < ids.length; k++) {
+            if (isMenuOn(ids[k])) {
+                shown.add(labels[k]);
+                keys.add(ids[k]);
+            }
+        }
+        shown.add("菜单项设置");
+        new AlertDialog.Builder(this)
+            .setTitle(allMode ? "全部订阅" : (src == null ? "收藏" : src.displayTitle()))
+            .setItems(shown.toArray(new String[0]), (d, w) -> {
+                if (w == shown.size() - 1) {
+                    configRssMenu();
+                    return;
+                }
+                String id = keys.get(w);
+                if ("resort".equals(id)) resort();
+                else if ("vars".equals(id)) editSourceVars();
+                else if ("edit".equals(id)) editSource();
+                else if ("layout".equals(id)) toggleCompact();
+                else if ("clear".equals(id)) clearList();
+            })
+            .show();
+    }
+
+    private void configRssMenu() {
+        final String[] ids = menuIds();
+        final String[] labels = menuLabels();
+        boolean[] checked = new boolean[ids.length];
+        for (int k = 0; k < ids.length; k++) checked[k] = isMenuOn(ids[k]);
+        new AlertDialog.Builder(this)
+            .setTitle("菜单项设置（勾选显示）")
+            .setMultiChoiceItems(labels, checked, (d, which, isChecked) -> checked[which] = isChecked)
+            .setPositiveButton("保存", (d, w) -> {
+                StringBuilder off = new StringBuilder();
+                for (int k = 0; k < ids.length; k++) {
+                    if (!checked[k]) {
+                        if (off.length() > 0) off.append(',');
+                        off.append(ids[k]);
+                    }
+                }
+                getPrefs(this).edit().putString(P_MENU_OFF, off.toString()).apply();
+                Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show();
+            })
+            .setNegativeButton("取消", null)
+            .show();
+    }
+
+    private void resort() {
+        java.util.Collections.sort(articles, (a, b) -> {
+            String x = a.pubDate == null ? "" : a.pubDate;
+            String y = b.pubDate == null ? "" : b.pubDate;
+            int c = y.compareTo(x);
+            if (c != 0) return c;
+            String n1 = a.source == null ? "" : a.source;
+            String n2 = b.source == null ? "" : b.source;
+            return n1.compareTo(n2);
+        });
+        adapter.notifyDataSetChanged();
+        Toast.makeText(this, "已按时间重新整理", Toast.LENGTH_SHORT).show();
+    }
+
+    private void editSourceVars() {
+        if (src == null) {
+            Toast.makeText(this, "全部订阅/收藏没有单独的源变量", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        android.widget.EditText et = new android.widget.EditText(this);
+        et.setText(src.header == null ? "" : src.header);
+        et.setTextSize(12);
+        et.setSingleLine(false);
+        et.setMinLines(4);
+        et.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        et.setHint("请求头 JSON，例如 {\"Cookie\":\"a=b\",\"User-Agent\":\"Mozilla/5.0\"}");
+        new AlertDialog.Builder(this)
+            .setTitle("设定源变量（请求头）")
+            .setView(et)
+            .setPositiveButton("保存", (d, w) -> {
+                src.header = et.getText().toString().trim();
+                FeedStore.replace(this, src.url, src.name, src);
+                Toast.makeText(this, "已保存源变量", Toast.LENGTH_SHORT).show();
+            })
+            .setNegativeButton("取消", null)
+            .show();
+    }
+
+    private void editSource() {
+        if (src == null) {
+            Toast.makeText(this, "全部订阅/收藏没有单独的源", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent it = new Intent(this, FeedEditActivity.class);
+        it.putExtra(FeedEditActivity.EXTRA_SOURCE_JSON, src.toLegado().toString());
+        it.putExtra(FeedEditActivity.EXTRA_ORIG_URL, src.url);
+        it.putExtra(FeedEditActivity.EXTRA_ORIG_NAME, src.name);
+        startActivity(it);
+    }
+
+    private void toggleCompact() {
+        compact = !compact;
+        getPrefs(this).edit().putString("rss_list_compact", compact ? "true" : "false").apply();
+        adapter.notifyDataSetChanged();
+        Toast.makeText(this, compact ? "紧凑布局" : "常规布局", Toast.LENGTH_SHORT).show();
+    }
+
+    private void clearList() {
+        FeedState.clearCache(this);
+        articles.clear();
+        adapter.notifyDataSetChanged();
+        empty.setVisibility(View.VISIBLE);
+        empty.setText("已清除缓存，正在重新加载…");
+        load();
+    }
 }

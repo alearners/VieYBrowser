@@ -449,10 +449,23 @@ public class BookmarkManager {
 			if (b.isFolder && DEFAULT_FOLDER_TITLE.equals(b.title)) {
 				JSONArray arr = new JSONArray();
 				collectBookmarks(b.children, arr);
+				removeBuiltinLinks(arr);
 				return arr.toString();
 			}
 		}
 		return "[]";
+	}
+
+	/** 主页不再展示内建的开源地址等条目（按用户在书签里保留，仅从主页数据里剔除） */
+	private static void removeBuiltinLinks(JSONArray arr) {
+		try {
+			for (int i = arr.length() - 1; i >= 0; i--) {
+				JSONObject o = arr.optJSONObject(i);
+				if (o == null) continue;
+				String url = o.optString("url", "");
+				if (url.contains("github.com/awzx3214/VieYBrowser")) arr.remove(i);
+			}
+		} catch (Exception ignored) {}
 	}
 
 	private static int countItems(Bookmark b) {

@@ -35,21 +35,19 @@ public class SettingsActivity extends BaseActivity {
 		loadSettings();
 		
 		findViewById(R.id.back_tool).setOnClickListener(v -> finish());
-		findViewById(R.id.menu_tool).setOnClickListener(v -> i.utw(R.string.operation, "test"));
+		findViewById(R.id.menu_tool).setOnClickListener(v -> showOpLevelDialog());
 		
 		if (VieYApp.isDarkMode(this)) {
 			i.zs(findViewById(R.id.back_tool), "#ffffff");
 			i.zs(findViewById(R.id.menu_tool), "#ffffff");
-			i.zs(findViewById(R.id.sign_tool), "#ffffff");
 		}
 	}
 	
 	
 	private void buildUi() {
 		addSection(getString(R.string.about));
-		addAppInfoBlock();
 		
-		addItem(getString(R.string.about_info), v -> i.utw(getString(R.string.about), getString(R.string.about_text)));
+		addItem(getString(R.string.about_info), v -> showAboutDialog());
 		
 		addItem(getString(R.string.open_source_license), v -> i.hw("https://awzx3214.github.io/VieYBrowser/md/license.html"));
 		
@@ -109,6 +107,7 @@ public class SettingsActivity extends BaseActivity {
 		addSection("订阅");
 		addItem("订阅源管理 / RSS·Atom", v -> startActivity(new Intent(this, FeedActivity.class)));
 		addItem("导入·导出 阅读(Legado) 订阅备份", v -> startActivity(new Intent(this, FeedActivity.class)));
+		addItem("RSS 源仓库（一键导入订阅源）", v -> showRssRepoDialog());
 		addItem("全部订阅文章（聚合时间线）", v -> {
 			Intent it = new Intent(this, FeedItemsActivity.class);
 			it.putExtra(FeedItemsActivity.EXTRA_ALL, true);
@@ -166,6 +165,24 @@ public class SettingsActivity extends BaseActivity {
 		textWebFont = addValueItem("网页字体文件 (.ttf/.otf)", v -> pickWebFont());
 		textWebFont.setText(FontInject.fontFile(this) == null ? "未选择" : FontInject.fontFile(this).getName());
 		
+		addSection("广告拦截");
+		addSwitchItem("规则式广告拦截（订阅 / 手动规则）", AdBlock.enabled(this), (v, is) -> {
+			AdBlock.setEnabled(this, is);
+			if (is && AdBlock.ruleCount(this) == 0) showAdBlockRulesDialog();
+		});
+		addItem("拦截规则（" + AdBlock.ruleCount(this) + " 条）", v -> showAdBlockRulesDialog());
+		addItem("规则订阅地址（每行一个）", v -> showAdBlockSubsDialog());
+		addItem("立即更新订阅规则", v -> updateAdBlockSubs());
+		addValueItem("已拦截请求", v -> showAdBlockStats()).setText(AdBlock.hits(this) + " 次");
+
+		if (OpLevel.get(this) >= OpLevel.POWER) {
+		addSection("备份与恢复");
+		addItem("导出全部设置与订阅（.json）", v -> exportAllBackup());
+		addItem("导入全部设置与订阅（.json）", v -> importAllBackup());
+		addItem("子选项：导出阅读/RSS 订阅备份（.zip）", v -> exportRssBackup());
+		addItem("子选项：从阅读备份恢复订阅（.zip / .json）", v -> importRssBackup());
+		}
+
 		addSection("浏览增强");
 		addSwitchItem("安全浏览拦截（可疑域名提示页）", SafeBrowse.enabled(this), (v, is) -> SafeBrowse.setEnabled(this, is));
 		addSwitchItem("看图模式（点图放大）", "true".equals(getPrefs(this).getString("image_mode", "false")), (v, is) -> getPrefs(this).edit().putString("image_mode", is ? "true" : "false").apply());
@@ -175,6 +192,7 @@ public class SettingsActivity extends BaseActivity {
 			Toast.makeText(this, is ? "已开启，刷新页面后出现光标" : "已关闭，刷新页面后移除光标", Toast.LENGTH_SHORT).show();
 		});
 		
+		if (OpLevel.get(this) >= OpLevel.POWER) {
 		addSection("协议工具");
 		addItem("MQTT 订阅（Paho mqttv3）", v -> startActivity(new Intent(this, MqttActivity.class)));
 		addItem("FTP 目录浏览 / 下载（commons-net）", v -> startActivity(new Intent(this, FtpActivity.class)));
@@ -195,6 +213,7 @@ public class SettingsActivity extends BaseActivity {
 		addItem("悬浮窗浏览（Service + WebView 浮层）", v -> toggleFloatWindow());
 		addItem("uTP 自检（头部 / 停等传输）", v -> runUtpSelfTest());
 		addItem("下载连接数（每任务上限）", v -> showDlConnsDialog());
+		}
 		
 		textToolbarPosition = addValueItem(getString(R.string.toolbar_position), v -> showToolbarPosDialog());
 		textHomeMode = addValueItem(getString(R.string.home_mode), v -> showHomeModeDialog());
@@ -442,16 +461,16 @@ public class SettingsActivity extends BaseActivity {
 	
 	private void loadAppInfo() {
 		try {
-			appLogo.setImageDrawable(
+			if (appLogo != null) appLogo.setImageDrawable(
 			getPackageManager().getApplicationIcon(getPackageName()));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		try {
 			PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
-			appVersion.setText(pi.versionName + "  " + pi.versionCode);
+			if (appVersion != null) appVersion.setText(pi.versionName + "  " + pi.versionCode);
 		} catch (Exception e) {
-			appVersion.setText("unknown");
+			if (appVersion != null) appVersion.setText("unknown");
 		}
 	}
 	
@@ -770,6 +789,59 @@ public class SettingsActivity extends BaseActivity {
 			}
 			return;
 		}
+		if (requestCode == 4103 && resultCode == RESULT_OK && data != null && data.getData() != null) {
+			try (java.io.OutputStream out = getContentResolver().openOutputStream(data.getData())) {
+				out.write(Backup.exportJson(this).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+				Toast.makeText(this, "已导出全部设置与订阅", Toast.LENGTH_LONG).show();
+			} catch (Exception e) {
+				Toast.makeText(this, "导出失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+			}
+			return;
+		}
+		if (requestCode == 4104 && resultCode == RESULT_OK && data != null && data.getData() != null) {
+			try (java.io.InputStream in = getContentResolver().openInputStream(data.getData())) {
+				java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+				byte[] buf = new byte[8192];
+				int n;
+				while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
+				int files = Backup.importJson(this, new String(bos.toByteArray(), java.nio.charset.StandardCharsets.UTF_8));
+				new android.app.AlertDialog.Builder(this)
+					.setTitle("导入完成")
+					.setMessage("已恢复 " + files + " 组设置与订阅数据。部分设置需要重启软件后生效。")
+					.setPositiveButton("立即重启", (d, w) -> {
+						android.content.Intent it = getPackageManager().getLaunchIntentForPackage(getPackageName());
+						if (it != null) {
+							it.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+							startActivity(it);
+						}
+						Runtime.getRuntime().exit(0);
+					})
+					.setNegativeButton("稍后", null)
+					.show();
+			} catch (Exception e) {
+				Toast.makeText(this, "导入失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+			}
+			return;
+		}
+		if (requestCode == 4105 && resultCode == RESULT_OK && data != null && data.getData() != null) {
+			try (java.io.OutputStream out = getContentResolver().openOutputStream(data.getData())) {
+				out.write(Backup.exportRssZip(this));
+				Toast.makeText(this, "已导出阅读/RSS 订阅备份（可在阅读 App 内恢复）", Toast.LENGTH_LONG).show();
+			} catch (Exception e) {
+				Toast.makeText(this, "导出失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+			}
+			return;
+		}
+		if (requestCode == 4106 && resultCode == RESULT_OK && data != null && data.getData() != null) {
+			try (java.io.InputStream in = getContentResolver().openInputStream(data.getData())) {
+				int n = Backup.importRss(this, in);
+				Toast.makeText(this, "已导入订阅源 " + n + " 个", Toast.LENGTH_LONG).show();
+				recreate();
+			} catch (Exception e) {
+				Toast.makeText(this, "导入失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+			}
+			return;
+		}
 		if (requestCode == 10001 && resultCode == RESULT_OK && data != null) {
 			String url = data.getStringExtra(EngineActivity.EXTRA_ENGINE_URL);
 			if (url != null && !url.isEmpty()) {
@@ -780,6 +852,288 @@ public class SettingsActivity extends BaseActivity {
 		}
 	}
 	
+	private void showAboutDialog() {
+		LinearLayout box = new LinearLayout(this);
+		box.setOrientation(LinearLayout.VERTICAL);
+		box.setGravity(Gravity.CENTER_HORIZONTAL);
+		box.setPadding(i.dp2px(20), i.dp2px(16), i.dp2px(20), i.dp2px(4));
+
+		ImageView logo = new ImageView(this);
+		LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(i.dp2px(64), i.dp2px(64));
+		logo.setLayoutParams(lp);
+		try {
+			logo.setImageDrawable(getPackageManager().getApplicationIcon(getPackageName()));
+		} catch (Exception ignored) {}
+		box.addView(logo);
+
+		String ver = "unknown";
+		try {
+			PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+			ver = pi.versionName + "  " + pi.versionCode;
+		} catch (Exception ignored) {}
+		TextView v = makeInfoText("V i e Y", 18, R.color.text_primary, true);
+		v.setGravity(Gravity.CENTER);
+		box.addView(v);
+		TextView vv = makeInfoText(ver, 11, R.color.text_secondary, false);
+		vv.setGravity(Gravity.CENTER);
+		box.addView(vv);
+		TextView by = makeInfoText("呆毛飘啊飘", 11, R.color.text_secondary, false);
+		by.setGravity(Gravity.CENTER);
+		box.addView(by);
+		TextView g = makeInfoText(getString(R.string.green_app_declaration), 10, R.color.text_secondary, false);
+		g.setGravity(Gravity.CENTER);
+		box.addView(g);
+
+		new android.app.AlertDialog.Builder(this)
+			.setTitle("关于 VieY")
+			.setView(box)
+			.setPositiveButton("好", null)
+			.setNeutralButton("版本说明", (d, w) -> i.utw(getString(R.string.about), getString(R.string.about_text)))
+			.show();
+	}
+
+	private void showOpLevelDialog() {
+		LinearLayout box = new LinearLayout(this);
+		box.setOrientation(LinearLayout.VERTICAL);
+		box.setPadding(i.dp2px(20), i.dp2px(12), i.dp2px(20), i.dp2px(4));
+
+		TextView info = makeInfoText("当前：" + OpLevel.label(OpLevel.get(this))
+			+ "\n\n等级 2 密钥：viey（协议工具 / 插件 / 备份）"
+			+ "\n等级 3 密钥：viey-admin（全部，含实验项）", 12, R.color.text_secondary, false);
+		info.setPadding(0, 0, 0, i.dp2px(8));
+		box.addView(info);
+
+		EditText key = new EditText(this);
+		key.setHint("输入密钥");
+		key.setTextSize(14);
+		key.setSingleLine(true);
+		box.addView(key);
+
+		new android.app.AlertDialog.Builder(this)
+			.setTitle("操作等级")
+			.setView(box)
+			.setPositiveButton("解锁", (d, w) -> {
+				int lv = OpLevel.unlock(this, key.getText().toString());
+				if (lv > 0) {
+					Toast.makeText(this, "已解锁：" + OpLevel.label(lv), Toast.LENGTH_SHORT).show();
+					recreate();
+				} else {
+					Toast.makeText(this, "密钥不正确", Toast.LENGTH_SHORT).show();
+				}
+			})
+			.setNegativeButton("取消", null)
+			.setNeutralButton("降为等级 1", (d, w) -> {
+				OpLevel.set(this, OpLevel.NORMAL);
+				recreate();
+			})
+			.show();
+	}
+
+	private void showAdBlockRulesDialog() {
+		EditText et = new EditText(this);
+		et.setText(AdBlock.rules(this));
+		et.setTextSize(12);
+		et.setSingleLine(false);
+		et.setMinLines(8);
+		et.setGravity(Gravity.TOP | Gravity.START);
+		et.setHint("# 每行一条：||host^ / host / /path/ / @@||allow^");
+		new android.app.AlertDialog.Builder(this)
+			.setTitle("广告拦截规则（" + AdBlock.ruleCount(this) + " 条）")
+			.setView(et)
+			.setPositiveButton("保存", (d, w) -> {
+				AdBlock.setRules(this, et.getText().toString());
+				Toast.makeText(this, "已保存，刷新页面生效", Toast.LENGTH_SHORT).show();
+				recreate();
+			})
+			.setNegativeButton("取消", null)
+			.setNeutralButton("清空", (d, w) -> {
+				AdBlock.setRules(this, "");
+				recreate();
+			})
+			.show();
+	}
+
+	private void showAdBlockSubsDialog() {
+		EditText et = new EditText(this);
+		et.setText(AdBlock.subs(this));
+		et.setTextSize(12);
+		et.setSingleLine(false);
+		et.setMinLines(4);
+		et.setGravity(Gravity.TOP | Gravity.START);
+		et.setHint("https://example.com/easylist.txt");
+		new android.app.AlertDialog.Builder(this)
+			.setTitle("规则订阅地址")
+			.setView(et)
+			.setPositiveButton("保存", (d, w) -> {
+				AdBlock.setSubs(this, et.getText().toString());
+				Toast.makeText(this, "已保存，可点「立即更新订阅规则」", Toast.LENGTH_SHORT).show();
+			})
+			.setNegativeButton("取消", null)
+			.show();
+	}
+
+	private void updateAdBlockSubs() {
+		Toast.makeText(this, "正在拉取订阅…", Toast.LENGTH_SHORT).show();
+		new Thread(() -> {
+			String msg;
+			try {
+				int n = AdBlock.updateSubs(this);
+				msg = n == 0 ? "没有可用的订阅地址，或列表为空" : "已合并 " + n + " 条规则";
+			} catch (Exception e) {
+				msg = "更新失败：" + e.getMessage();
+			}
+			final String m = msg;
+			runOnUiThread(() -> Toast.makeText(this, m, Toast.LENGTH_LONG).show());
+		}, "adblock-subs").start();
+	}
+
+	private void showAdBlockStats() {
+		new android.app.AlertDialog.Builder(this)
+			.setTitle("广告拦截统计")
+			.setMessage("已拦截请求：" + AdBlock.hits(this) + " 次\n规则条数：" + AdBlock.ruleCount(this)
+				+ "\n状态：" + (AdBlock.enabled(this) ? "已开启" : "已关闭"))
+			.setPositiveButton("清零", (d, w) -> {
+				AdBlock.resetHits(this);
+				recreate();
+			})
+			.setNegativeButton("关闭", null)
+			.show();
+	}
+
+	private void exportAllBackup() {
+		Intent it = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+		it.addCategory(Intent.CATEGORY_OPENABLE);
+		it.setType("application/json");
+		it.putExtra(Intent.EXTRA_TITLE, "VieY-backup-" + new java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.US).format(new java.util.Date()) + ".json");
+		try {
+			startActivityForResult(it, 4103);
+		} catch (Exception e) {
+			Toast.makeText(this, "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
+		}
+	}
+
+	private void importAllBackup() {
+		Intent it = new Intent(Intent.ACTION_GET_CONTENT);
+		it.setType("*/*");
+		it.addCategory(Intent.CATEGORY_OPENABLE);
+		try {
+			startActivityForResult(Intent.createChooser(it, "选择 VieY 备份"), 4104);
+		} catch (Exception e) {
+			Toast.makeText(this, "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
+		}
+	}
+
+	private void exportRssBackup() {
+		Intent it = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+		it.addCategory(Intent.CATEGORY_OPENABLE);
+		it.setType("application/zip");
+		it.putExtra(Intent.EXTRA_TITLE, "viey-rss-" + new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(new java.util.Date()) + ".zip");
+		try {
+			startActivityForResult(it, 4105);
+		} catch (Exception e) {
+			Toast.makeText(this, "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
+		}
+	}
+
+	private void importRssBackup() {
+		Intent it = new Intent(Intent.ACTION_GET_CONTENT);
+		it.setType("*/*");
+		it.addCategory(Intent.CATEGORY_OPENABLE);
+		try {
+			startActivityForResult(Intent.createChooser(it, "选择阅读订阅备份"), 4106);
+		} catch (Exception e) {
+			Toast.makeText(this, "没有可用的文件选择器", Toast.LENGTH_SHORT).show();
+		}
+	}
+
+	private void showRssRepoDialog() {
+		final EditText url = new EditText(this);
+		url.setText(getPrefs(this).getString("rss_repo_url", "https://www.yck2026.fun/yuedu/rss/index.html"));
+		url.setTextSize(12);
+		url.setSingleLine(false);
+		new android.app.AlertDialog.Builder(this)
+			.setTitle("RSS 源仓库（一键导入）")
+			.setMessage("输入源仓库页面地址，读取其中的订阅源列表后点选导入。")
+			.setView(url)
+			.setPositiveButton("读取列表", (d, w) -> {
+				final String u = url.getText().toString().trim();
+				getPrefs(this).edit().putString("rss_repo_url", u).apply();
+				fetchRssRepo(u);
+			})
+			.setNegativeButton("取消", null)
+			.show();
+	}
+
+	private void fetchRssRepo(final String pageUrl) {
+		Toast.makeText(this, "正在读取源仓库…", Toast.LENGTH_SHORT).show();
+		new Thread(() -> {
+			final java.util.List<String> links = new java.util.ArrayList<>();
+			final java.util.List<String> names = new java.util.ArrayList<>();
+			String err = null;
+			try {
+				org.jsoup.nodes.Document doc = org.jsoup.Jsoup.connect(pageUrl)
+					.userAgent("Mozilla/5.0 (Linux; Android 14) VieY")
+					.timeout(20000)
+					.ignoreContentType(true)
+					.get();
+				for (org.jsoup.nodes.Element a : doc.select("a[href]")) {
+					String href = a.attr("abs:href");
+					if (href == null) continue;
+					String low = href.toLowerCase();
+					if (!(low.endsWith(".json") || low.endsWith(".zip") || low.contains("/rss/") || low.contains("rsssource"))) continue;
+					links.add(href);
+					String t = a.text().trim();
+					names.add(t.isEmpty() ? href.substring(href.lastIndexOf('/') + 1) : t);
+				}
+			} catch (Exception e) {
+				err = e.getMessage();
+			}
+			final String e2 = err;
+			runOnUiThread(() -> {
+				if (e2 != null) {
+					i.utw("读取失败", e2);
+					return;
+				}
+				if (links.isEmpty()) {
+					i.utw("没有找到订阅源", "该页面里没有 .json / .zip 形式的订阅源链接，可先打开页面确认结构。");
+					return;
+				}
+				String[] labels = new String[links.size()];
+				for (int k = 0; k < labels.length; k++) labels[k] = names.get(k);
+				new android.app.AlertDialog.Builder(this)
+					.setTitle("选择要导入的源（" + links.size() + "）")
+					.setItems(labels, (d, w) -> importRssLink(links.get(w)))
+					.show();
+			});
+		}, "rss-repo").start();
+	}
+
+	private void importRssLink(final String link) {
+		Toast.makeText(this, "正在导入…", Toast.LENGTH_SHORT).show();
+		new Thread(() -> {
+			String msg;
+			try {
+				java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(link).openConnection();
+				conn.setConnectTimeout(12000);
+				conn.setReadTimeout(25000);
+				conn.setRequestProperty("User-Agent", "Mozilla/5.0 VieY");
+				try (java.io.InputStream in = conn.getInputStream()) {
+					int n = FeedStore.importFrom(this, in);
+					msg = "已导入 " + n + " 个订阅源";
+				} finally {
+					conn.disconnect();
+				}
+			} catch (Exception e) {
+				msg = "导入失败：" + e.getMessage();
+			}
+			final String m = msg;
+			runOnUiThread(() -> {
+				Toast.makeText(this, m, Toast.LENGTH_LONG).show();
+				recreate();
+			});
+		}, "rss-import").start();
+	}
+
 	private void clearCache() {
 		try {
 			android.webkit.WebView webView = new android.webkit.WebView(this);

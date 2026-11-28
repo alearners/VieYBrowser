@@ -1165,6 +1165,14 @@ public class MainActivity extends BaseActivity {
 			bottomSheetDialog.dismiss();
 			AiActivity.open(MainActivity.this);
 		}));
+		menuList.add(new MenuGridItem(R.drawable.ic_search, "广告拦截", ()->{
+			bottomSheetDialog.dismiss();
+			showAdBlockPanel();
+		}));
+		menuList.add(new MenuGridItem(R.drawable.ic_ua, "虚拟鼠标", ()->{
+			bottomSheetDialog.dismiss();
+			showVirtualMousePanel();
+		}));
 		menuList.add(new MenuGridItem(R.drawable.ic_search, getString(R.string.page_search), ()->{
 			bottomSheetDialog.dismiss();
 			MainUtil.openPageSearch(MainActivity.this, isDarkMode, getCurrentWeb(), "");
@@ -1191,6 +1199,65 @@ public class MainActivity extends BaseActivity {
 	 * 取的是 document.body.innerText，已排除脚本与隐藏节点；长度在页面侧截断，
 	 * 避免大页面把 IPC 字符串撑爆。
 	 */
+	private void showVirtualMousePanel() {
+		final boolean on = VirtualMouse.isOn(this);
+		new android.app.AlertDialog.Builder(this)
+			.setTitle("虚拟鼠标")
+			.setMessage("单指拖动光标到目标元素，点按即触发该元素；双指仍用于滚动页面。\n当前：" + (on ? "已开启" : "已关闭"))
+			.setPositiveButton(on ? "关闭" : "开启", (d, w) -> {
+				VirtualMouse.setOn(this, !on);
+				Toast.makeText(this, !on ? "已开启，刷新页面后出现光标" : "已关闭，刷新页面后移除光标", Toast.LENGTH_SHORT).show();
+				android.webkit.WebView v = getCurrentWeb();
+				if (v != null) v.reload();
+			})
+			.setNegativeButton("取消", null)
+			.show();
+	}
+
+	private void showAdBlockPanel() {
+		boolean on = AdBlock.enabled(this);
+		String msg = "状态：" + (on ? "已开启" : "已关闭")
+			+ "\n规则：" + AdBlock.ruleCount(this) + " 条"
+			+ "\n订阅：" + (AdBlock.subs(this).trim().isEmpty() ? "未设置" : AdBlock.subs(this).trim().split("\\n").length + " 个地址")
+			+ "\n已拦截：" + AdBlock.hits(this) + " 次";
+		new android.app.AlertDialog.Builder(this)
+			.setTitle("广告拦截")
+			.setMessage(msg)
+			.setPositiveButton(on ? "关闭拦截" : "开启拦截", (d, w) -> {
+				AdBlock.setEnabled(this, !on);
+				Toast.makeText(this, !on ? "已开启，刷新页面生效" : "已关闭", Toast.LENGTH_SHORT).show();
+				if (!on && AdBlock.ruleCount(this) == 0) {
+					showAdBlockRulesDialog();
+				} else if (getCurrentWeb() != null) {
+					getCurrentWeb().reload();
+				}
+			})
+			.setNeutralButton("规则与订阅", (d, w) -> startActivity(new android.content.Intent(this, SettingsActivity.class)))
+			.setNegativeButton("取消", null)
+			.show();
+	}
+
+	private void showAdBlockRulesDialog() {
+		android.widget.EditText et = new android.widget.EditText(this);
+		et.setText(AdBlock.rules(this));
+		et.setTextSize(12);
+		et.setSingleLine(false);
+		et.setMinLines(8);
+		et.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+		et.setHint("# 每行一条：||host^ / host / /path/ / @@||allow^");
+		new android.app.AlertDialog.Builder(this)
+			.setTitle("广告拦截规则（" + AdBlock.ruleCount(this) + " 条）")
+			.setView(et)
+			.setPositiveButton("保存", (d, w) -> {
+				AdBlock.setRules(this, et.getText().toString());
+				if (getCurrentWeb() != null) getCurrentWeb().reload();
+				Toast.makeText(this, "已保存，页面已刷新", Toast.LENGTH_SHORT).show();
+			})
+			.setNegativeButton("取消", null)
+			.setNeutralButton("订阅地址", (d, w) -> startActivity(new android.content.Intent(this, SettingsActivity.class)))
+			.show();
+	}
+
 	private void aiSummarizePage() {
 		WebViey web = getCurrentWeb();
 		if (web == null || web.getUrl() == null) {
