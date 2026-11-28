@@ -205,6 +205,11 @@ public class AdBlock {
 	}
 
 	public static int hits(Context c) {
+		flush(c);
+		return rawHits(c);
+	}
+
+	private static int rawHits(Context c) {
 		return sp(c).getInt(KEY_HITS, 0);
 	}
 
@@ -506,6 +511,11 @@ public class AdBlock {
 	}
 
 	private static boolean ruleApplies(Net r, String url, String pageHost) {
+		return ruleApplies(r, url, pageHost, 0);
+	}
+
+	private static boolean ruleApplies(Net r, String url, String pageHost, int type) {
+		if (r.types != 0 && type != 0 && (r.types & type) == 0) return false;
 		if (r.incDomains != null && !domainListHit(pageHost, r.incDomains)) return false;
 		if (r.excDomains != null && domainListHit(pageHost, r.excDomains)) return false;
 		String uh = host(url);
@@ -517,6 +527,10 @@ public class AdBlock {
 	}
 
 	public static boolean blocked(Context c, String url, String pageUrl) {
+		return blocked(c, url, pageUrl, 0);
+	}
+
+	public static boolean blocked(Context c, String url, String pageUrl, int type) {
 		if (url == null || !enabled(c)) return false;
 		if (url.startsWith("viek://") || url.startsWith("data:") || url.startsWith("blob:") || url.startsWith("about:")) return false;
 		if (siteOff(c, pageUrl == null ? url : pageUrl)) return false;
@@ -526,11 +540,11 @@ public class AdBlock {
 		String pageHost = host(pageUrl);
 
 		boolean[] allowed = {false};
-		matchHostRules(h, low, pageHost, true, allowed);
+		matchHostRules(h, low, pageHost, true, allowed, type);
 		if (allowed[0]) return false;
-		if (matchHostRules(h, low, pageHost, false, null) > 0
-			|| matchPathRules(low, pageHost) > 0
-			|| matchGeneric(low, pageHost) > 0) {
+		if (matchHostRules(h, low, pageHost, false, null, type) > 0
+			|| matchPathRules(low, pageHost, type) > 0
+			|| matchGeneric(low, pageHost, type) > 0) {
 			hit(c);
 			return true;
 		}
@@ -538,6 +552,10 @@ public class AdBlock {
 	}
 
 	private static int matchHostRules(String h, String url, String pageHost, boolean exception, boolean[] allowed) {
+		return matchHostRules(h, url, pageHost, exception, allowed, 0);
+	}
+
+	private static int matchHostRules(String h, String url, String pageHost, boolean exception, boolean[] allowed, int type) {
 		if (h == null) return 0;
 		int hits = 0;
 		String probe = h;
@@ -546,7 +564,7 @@ public class AdBlock {
 			if (l != null) {
 				for (Net r : l) {
 					if (r.exception != exception) continue;
-					if (!ruleApplies(r, url, pageHost)) continue;
+					if (!ruleApplies(r, url, pageHost, type)) continue;
 					if (exception) { if (allowed != null) allowed[0] = true; return 1; }
 					hits++;
 				}
@@ -559,6 +577,10 @@ public class AdBlock {
 	}
 
 	private static int matchPathRules(String url, String pageHost) {
+		return matchPathRules(url, pageHost, 0);
+	}
+
+	private static int matchPathRules(String url, String pageHost, int type) {
 		if (byPathFirst.isEmpty()) return 0;
 		int hits = 0;
 		String path = url;
@@ -576,7 +598,7 @@ public class AdBlock {
 				if (l != null) {
 					for (Net r : l) {
 						if (r.exception || r.regex == null) continue;
-						if (!ruleApplies(r, url, pageHost)) continue;
+						if (!ruleApplies(r, url, pageHost, type)) continue;
 						if (r.regex.matcher(url).find()) hits++;
 					}
 				}
@@ -589,10 +611,14 @@ public class AdBlock {
 	}
 
 	private static int matchGeneric(String url, String pageHost) {
+		return matchGeneric(url, pageHost, 0);
+	}
+
+	private static int matchGeneric(String url, String pageHost, int type) {
 		int hits = 0;
 		for (Net r : generic) {
 			if (r.exception || r.regex == null) continue;
-			if (!ruleApplies(r, url, pageHost)) continue;
+			if (!ruleApplies(r, url, pageHost, type)) continue;
 			try {
 				if (r.regex.matcher(url).find()) hits++;
 			} catch (Throwable ignored) {}
@@ -608,7 +634,7 @@ public class AdBlock {
 	private static void flush(Context c) {
 		int n = pending.getAndSet(0);
 		if (n <= 0) return;
-		sp(c).edit().putInt(KEY_HITS, hits(c) + n).apply();
+		sp(c).edit().putInt(KEY_HITS, rawHits(c) + n).apply();
 	}
 
 	public static String hideCss(Context c, String pageUrl) {
@@ -681,7 +707,8 @@ public class AdBlock {
 				}
 			} catch (Throwable ignored) {}
 			boolean frame = req.isForMainFrame();
-			boolean hitIt = frame ? blockedDocument(c, url) : blocked(c, url, referer != null ? referer : url);
+			int type = inferType(url, req);
+			boolean hitIt = frame ? blockedDocument(c, url) : blocked(c, url, referer != null ? referer : url, type);
 			if (!hitIt) return null;
 			WebResourceResponse r = new WebResourceResponse("text/plain", "utf-8",
 				new ByteArrayInputStream(new byte[0]));
@@ -691,6 +718,43 @@ public class AdBlock {
 			return r;
 		} catch (Throwable ignored) {}
 		return null;
+	}
+
+	private static int inferType(String url, WebResourceRequest req) {
+		String low = url.toLowerCase();
+		String accept = null;
+		try {
+			Map<String, String> hd = req.getRequestHeaders();
+			if (hd != null) {
+				for (Map.Entry<String, String> e : hd.entrySet()) {
+					if (e.getKey() != null && e.getKey().equalsIgnoreCase("Accept")) {
+						accept = e.getValue();
+						break;
+					}
+				}
+			}
+		} catch (Throwable ignored) {}
+		if (accept != null) {
+			accept = accept.toLowerCase();
+			if (accept.contains("image/")) return T_IMAGE;
+			if (accept.contains("text/css")) return T_STYLE;
+			if (accept.contains("text/html")) return T_DOC;
+			if (accept.contains("javascript")) return T_SCRIPT;
+			if (accept.contains("font/")) return T_FONT;
+			if (accept.contains("video/") || accept.contains("audio/")) return T_MEDIA;
+			if (accept.contains("application/json")) return T_XHR;
+		}
+		int q = low.indexOf('?');
+		String path = q >= 0 ? low.substring(0, q) : low;
+		if (path.endsWith(".js") || path.endsWith(".mjs")) return T_SCRIPT;
+		if (path.endsWith(".css")) return T_STYLE;
+		if (path.endsWith(".png") || path.endsWith(".jpg") || path.endsWith(".jpeg") || path.endsWith(".gif")
+			|| path.endsWith(".webp") || path.endsWith(".svg") || path.endsWith(".ico") || path.endsWith(".bmp")) return T_IMAGE;
+		if (path.endsWith(".woff") || path.endsWith(".woff2") || path.endsWith(".ttf") || path.endsWith(".otf")) return T_FONT;
+		if (path.endsWith(".mp4") || path.endsWith(".m3u8") || path.endsWith(".mp3") || path.endsWith(".m4a")
+			|| path.endsWith(".webm") || path.endsWith(".flv")) return T_MEDIA;
+		if (path.endsWith(".html") || path.endsWith(".htm")) return T_DOC;
+		return T_OTHER;
 	}
 
 	private static boolean blockedDocument(Context c, String url) {
