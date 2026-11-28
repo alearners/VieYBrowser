@@ -23,3 +23,6 @@
 -allowaccessmodification
 -repackageclasses ''
 -optimizationpasses 5
+
+# AI 页面由 Intent 显式启动，类名必须保留
+-keep public class kawaii.viey.browser.AiActivity
