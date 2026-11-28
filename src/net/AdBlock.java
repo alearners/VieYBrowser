@@ -345,12 +345,16 @@ public class AdBlock {
 		if (options != null && parseOptions(r, options)) return null;
 
 		boolean anchorStart = false, anchorEnd = false;
-		if (s.startsWith("|")) { anchorStart = true; s = s.substring(1); }
+		boolean hostAnchor = false;
+		if (s.startsWith("||")) {
+			hostAnchor = true;
+			s = s.substring(2);
+		} else if (s.startsWith("|")) {
+			anchorStart = true;
+			s = s.substring(1);
+		}
 		if (s.endsWith("|")) { anchorEnd = true; s = s.substring(0, s.length() - 1); }
 		if (s.isEmpty()) return null;
-
-		boolean hostAnchor = false;
-		if (s.startsWith("||")) { hostAnchor = true; s = s.substring(2); }
 
 		if (s.length() > 2 && s.startsWith("/") && s.endsWith("/")) {
 			try {
