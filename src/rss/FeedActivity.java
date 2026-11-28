@@ -168,7 +168,8 @@ public class FeedActivity extends BaseActivity {
     private void pickImport() {
         new AlertDialog.Builder(this)
             .setTitle("导入订阅源")
-            .setItems(new String[]{"用系统文件选择器", "从设备路径导入（如 /sdcard/Download/rss_src.json）"}, (d, w) -> {
+            .setMessage("系统选择器看不到未建索引的新文件；路径导入需放在应用目录（Android/data/kawaii.viey.browser/files/），分区存储下应用无权限读 Download。")
+            .setItems(new String[]{"用系统文件选择器", "从应用目录 / 路径导入"}, (d, w) -> {
                 if (w == 1) importFromPath();
                 else pickImportDocument();
             })
@@ -178,7 +179,8 @@ public class FeedActivity extends BaseActivity {
     private void importFromPath() {
         EditText et = new EditText(this);
         et.setSingleLine(true);
-        et.setText("/sdcard/Download/rss_src.json");
+        java.io.File def = new java.io.File(getExternalFilesDir(null), "rss_src.json");
+        et.setText(def.getAbsolutePath());
         et.setTextSize(13);
         new AlertDialog.Builder(this)
             .setTitle("从路径导入")
