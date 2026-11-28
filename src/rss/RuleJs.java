@@ -64,9 +64,30 @@ public class RuleJs {
         long t0 = System.currentTimeMillis();
         List<FeedParser.Article> list = parse(c, s, s.url, html);
         long ms = System.currentTimeMillis() - t0;
-        if (list.isEmpty()) return "未解析到条目，耗时 " + ms + "ms" + (lastError.isEmpty() ? "（无脚本错误，检查开关与规则）" : "；脚本异常：" + lastError);
-        FeedParser.Article a = list.get(0);
-        return "解析 " + list.size() + " 条，耗时 " + ms + "ms；首条：" + a.title + " → " + a.link;
+        String line1;
+        if (list.isEmpty()) {
+            line1 = "DOM：未解析到条目，耗时 " + ms + "ms" + (lastError.isEmpty() ? "（无脚本错误，检查开关与规则）" : "；脚本异常：" + lastError);
+        } else {
+            FeedParser.Article a = list.get(0);
+            line1 = "DOM：解析 " + list.size() + " 条，耗时 " + ms + "ms；首条：" + a.title + " → " + a.link;
+        }
+
+        FeedSource s2 = new FeedSource();
+        s2.name = "自检ajax";
+        s2.url = "https://www.baidu.com/";
+        s2.ruleArticles = "@js: window.__t=java.ajax('https://www.baidu.com'); [document.createElement('div')]";
+        s2.ruleTitle = "@js: String(window.__t ? window.__t.length : -1)";
+        long t1 = System.currentTimeMillis();
+        List<FeedParser.Article> l2 = parse(c, s2, s2.url, "<html><body></body></html>");
+        long ms2 = System.currentTimeMillis() - t1;
+        String line2;
+        if (l2.isEmpty()) {
+            line2 = "ajax：失败，耗时 " + ms2 + "ms" + (lastError.isEmpty() ? "" : "；" + lastError);
+        } else {
+            String n = l2.get(0).title;
+            line2 = "ajax：" + (n.equals("-1") ? "未取到响应" : "取回 " + n + " 字节") + "，耗时 " + ms2 + "ms";
+        }
+        return line1 + "\n" + line2;
     }
 
     private static boolean js(String rule) {

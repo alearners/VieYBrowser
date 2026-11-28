@@ -114,7 +114,11 @@ public class SettingsActivity extends BaseActivity {
 			Toast.makeText(this, "自检中…", Toast.LENGTH_SHORT).show();
 			new Thread(() -> {
 				String r = RuleJs.selfTest(getApplicationContext());
-				runOnUiThread(() -> Toast.makeText(this, r, Toast.LENGTH_LONG).show());
+				runOnUiThread(() -> new android.app.AlertDialog.Builder(this)
+					.setTitle("沙箱自检")
+					.setMessage(r)
+					.setPositiveButton("知道了", null)
+					.show());
 			}).start();
 		});
 		addItem("全部订阅文章（聚合时间线）", v -> {
