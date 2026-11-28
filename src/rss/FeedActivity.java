@@ -168,7 +168,7 @@ public class FeedActivity extends BaseActivity {
     private void pickImport() {
         new AlertDialog.Builder(this)
             .setTitle("导入订阅源")
-            .setMessage("系统选择器看不到未建索引的新文件；路径导入需放在应用目录（Android/data/kawaii.viey.browser/files/），分区存储下应用无权限读 Download。")
+            .setMessage("路径导入请用应用目录（Android/data/kawaii.viey.browser/files/）")
             .setItems(new String[]{"用系统文件选择器", "从应用目录 / 路径导入"}, (d, w) -> {
                 if (w == 1) importFromPath();
                 else pickImportDocument();
