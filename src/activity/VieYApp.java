@@ -351,6 +351,19 @@ public class VieYApp extends Application {
 		copyThis();
 		instance = this;
 		i.m(getApplicationContext());
+		autoSelfCheckOnce();
+	}
+	
+	/** dev 包启动时后台跑一次全功能自检，结果进 logcat（tag: viey-selfcheck），便于无人值守验证 */
+	private void autoSelfCheckOnce() {
+		try {
+			String vn = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+			if (vn != null && vn.endsWith("-dev")) {
+				SelfCheck.runAndLog(getApplicationContext());
+				SelfCheck.probeFeed(getApplicationContext());
+			}
+		} catch (Throwable ignored) {
+		}
 	}
 	
 	public static VieYApp getInstance() {

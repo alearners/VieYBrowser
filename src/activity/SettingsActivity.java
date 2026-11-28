@@ -200,6 +200,16 @@ public class SettingsActivity extends BaseActivity {
 			.setMessage(AdBlock.selfTest(this))
 			.setPositiveButton("知道了", null)
 			.show());
+		addItem("全功能自检（订阅/广告/下载/书签/AI/BT）", v -> {
+			String r = SelfCheck.run(this);
+			android.text.ClipboardManager cm = (android.text.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+			if (cm != null) cm.setText(r);
+			new android.app.AlertDialog.Builder(this)
+				.setTitle("全功能自检")
+				.setMessage(r)
+				.setPositiveButton("知道了", null)
+				.show();
+		});
 
 		if (OpLevel.get(this) >= OpLevel.POWER) {
 		addSection("备份与恢复");
