@@ -117,11 +117,20 @@ public class RuleJs {
                 ws.setJavaScriptEnabled(true);
                 ws.setBlockNetworkLoads(false);
                 ws.setAllowFileAccess(false);
+                ws.setAllowUniversalAccessFromFileURLs(true);
+                ws.setAllowFileAccessFromFileURLs(true);
                 ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
                 ws.setBlockNetworkImage(true);
                 ws.setDomStorageEnabled(true);
                 final WebView fwv = wv;
                 final boolean[] done = {false};
+                wv.setWebChromeClient(new android.webkit.WebChromeClient() {
+                    @Override
+                    public boolean onConsoleMessage(android.webkit.ConsoleMessage m) {
+                        android.util.Log.i("viey-rulejs-js", m.message() + " @" + m.lineNumber());
+                        return true;
+                    }
+                });
                 wv.setWebViewClient(new WebViewClient() {
                     @Override
                     public void onPageFinished(WebView view, String u) {
