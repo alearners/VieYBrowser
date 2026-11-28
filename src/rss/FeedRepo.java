@@ -13,8 +13,11 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -22,6 +25,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+
+import javax.net.ssl.SSLException;
 
 /**
  * 订阅刷新与条目缓存：filesDir/rss/items/<sha1(url)>.json
@@ -149,7 +154,12 @@ public class FeedRepo {
      */
     public static FetchResult load(Context c, FeedSource s) throws Exception {
         FetchResult r = new FetchResult();
-        String body = fetch(c, s.url, s);
+        String body;
+        try {
+            body = fetch(c, s.url, s);
+        } catch (Exception e) {
+            throw new Exception(netMsg(s.url, e), e);
+        }
         r.bytes = body.length();
         r.body = body;
         r.items = FeedParser.parse(c, body, s, s.url);
@@ -189,6 +199,28 @@ public class FeedRepo {
             return "该地址是前端框架动态页（SPA），正文由 JS 渲染；请在源里填 preloadJs/injectJs 或用 @js 规则，必要时需登录";
         if (noRule) return "该地址不含 RSS/Atom，也没有列表结构；请填栏目规则 ruleArticles，或换成该站真正的 RSS 地址";
         return "规则没匹配到条目：检查 ruleArticles 的 CSS 选择器，或改成 @js: 脚本规则";
+    }
+
+    /** 网络异常也要给出可执行的提示，而不是把 "timeout" 原样丢给用户 */
+    private static String netMsg(String url, Exception e) {
+        String host = hostOf(url);
+        if (e instanceof SocketTimeoutException)
+            return "网络超时：连接或读取 " + host + " 超过 20 秒未完成\n建议：换 Wi-Fi / 移动网络或挂代理；该站也可能只允许登录后访问";
+        if (e instanceof UnknownHostException)
+            return "域名解析失败：" + host + "\n建议：检查地址拼写，或换一个网络的 DNS";
+        if (e instanceof SSLException)
+            return "TLS 握手失败：" + host + "\n建议：该站证书或加密方式不被系统信任，换网络或换该站的 http/RSS 地址";
+        String m = e.getMessage();
+        return "网络请求失败：" + host + (m == null ? "" : "（" + m + "）") + "\n建议：稍后重试，或先确认手机浏览器能打开该地址";
+    }
+
+    private static String hostOf(String url) {
+        try {
+            String h = new URL(url).getHost();
+            return h == null || h.isEmpty() ? url : h;
+        } catch (Exception e) {
+            return url;
+        }
     }
 
     /** 抓一个源并写缓存；返回抓到的条数，异常向上抛 */

@@ -457,6 +457,14 @@ public class AdBlock {
 			return false;
 		}
 
+		/** 主框架（顶层文档）：先看 @@ 白名单，再看显式 $document 规则 */
+		boolean mainFrameBlocked(String url, String pageHost) {
+			String u = url == null ? "" : url.toLowerCase();
+			String h = pageHost;
+			if (any(u, h, T_DOC, true, false)) return false;
+			return any(u, h, T_DOC, false, true);
+		}
+
 		boolean blocked(String url, String pageHost, int type) {
 			if (any(url, pageHost, type, true, false)) return false;
 			return any(url, pageHost, type, false, false);
@@ -616,6 +624,15 @@ public class AdBlock {
 	}
 
 	public static int ruleCount(Context c) {
+		String manual = rules(c);
+		if (manual == null || manual.trim().isEmpty()) {
+			// 未种子化（用户还没开过开关）时也如实显示会生效的默认规则条数
+			Engine e = new Engine();
+			e.parse(DEFAULT_RULES);
+			String sub = subsCache(c);
+			if (sub != null && !sub.trim().isEmpty()) e.parse(sub);
+			return e.count;
+		}
 		return engine(c).count;
 	}
 
@@ -764,8 +781,7 @@ public class AdBlock {
 				// 主框架只有显式 $document 规则才拦
 				if (!enabled(c) || siteOff(c, url)) return null;
 				Engine e = engine(c);
-				if (e.any(url.toLowerCase(), host(url), T_DOC, true, false)) hitIt = false;
-				else hitIt = e.any(url.toLowerCase(), host(url), T_DOC, false, true);
+				hitIt = e.mainFrameBlocked(url, host(url));
 				if (hitIt) hit(c);
 			} else {
 				hitIt = blocked(c, url, referer != null ? referer : url, type);
@@ -909,7 +925,8 @@ public class AdBlock {
 			+ "news.example#@#.keep-box\n"
 			+ "##.generic-ad\n"
 			+ "-ad-banner.\n"
-			+ "||dropped.example.com^$redirect=noop.js\n";
+			+ "||dropped.example.com^$redirect=noop.js\n"
+			+ "||plain.example.net^\n";
 
 	/**
 	 * 离线自检：用内置规则集构造独立引擎，逐条断言匹配结果与元素隐藏输出，
@@ -942,8 +959,11 @@ public class AdBlock {
 		pass += check(b, total++, "正则规则", e.blocked("https://x.example/ad123/a.js", "https://x.example/", T_SCRIPT));
 		pass += check(b, total++, "首尾锚定精确匹配", e.blocked("https://exact.example.com/x.js", "https://exact.example.com/", T_SCRIPT)
 			&& !e.blocked("https://exact.example.com/x.js?v=1", "https://exact.example.com/", T_SCRIPT));
-		pass += check(b, total++, "主框架仅 $document 拦截", e.blocked("https://example.com/", "https://example.com/", T_DOC)
-			&& !e.blocked("https://ads.example.com/", "https://ads.example.com/", T_DOC));
+		pass += check(b, total++, "主框架仅 $document 拦截",
+			e.mainFrameBlocked("https://example.com/", "example.com")
+			&& !e.mainFrameBlocked("https://plain.example.net/", "plain.example.net")
+			&& e.blocked("https://plain.example.net/a.js", "https://news.example/", T_SCRIPT)
+			&& !e.mainFrameBlocked("https://good.example.com/", "good.example.com"));
 
 		String css = e.hideCss("news.example");
 		boolean cssOk = css != null && css.contains(".ad-box") && css.contains(".generic-ad") && !css.contains(".keep-box");

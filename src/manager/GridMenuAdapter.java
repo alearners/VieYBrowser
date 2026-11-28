@@ -34,12 +34,15 @@ public class GridMenuAdapter extends RecyclerView.Adapter<GridMenuAdapter.ViewHo
 		holder.ivIcon.setImageResource(item.iconRes);
 		
 		int iconColor = isDarkMode ? Color.WHITE : Color.BLACK;
-        if(i.getString(R.string.night_mode).equals(item.text) && isDarkMode) {
-        iconColor = i.getColor(R.color.accent);
-        holder.tvText.setTextColor(iconColor);
-        }
+		// 面板底色固定为 @color/card_bg（浅色 #FFF / 深色 #333），文字色必须显式给，
+		// 否则部分 ROM 的 BottomSheetDialog 会给到白色文字，标签在浅底上完全看不见
+		int textColor = isDarkMode ? Color.WHITE : 0xFF212121;
+		if (isDarkMode && i.getString(R.string.night_mode).equals(item.text)) {
+			iconColor = i.getColor(R.color.accent);
+			textColor = iconColor;
+		}
 		holder.ivIcon.setImageTintList(ColorStateList.valueOf(iconColor));
-		
+		holder.tvText.setTextColor(textColor);
 		holder.tvText.setText(item.text);
 		holder.itemView.setOnClickListener(v -> {
 			if(item.action != null){
