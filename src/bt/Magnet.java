@@ -70,7 +70,9 @@ public class Magnet {
             if (c >= 'A' && c <= 'Z') v = c - 'A';
             else if (c >= '2' && c <= '7') v = 26 + (c - '2');
             else throw new Exception("base32 非法字符：" + c);
-            bits.append(String.format("%05d", Integer.parseInt(Integer.toBinaryString(v))));
+            String bin = Integer.toBinaryString(v);
+            while (bin.length() < 5) bin = "0" + bin;
+            bits.append(bin);
         }
         if (bits.length() < 160) throw new Exception("base32 长度不足");
         StringBuilder hex = new StringBuilder();
@@ -85,5 +87,23 @@ public class Magnet {
         if (!displayName.isEmpty()) sb.append("&dn=").append(displayName);
         for (String tr : trackers) sb.append("&tr=").append(tr);
         return sb.toString();
+    }
+
+    /**
+     * magnet 没写 tr，或 tr 全是 UDP（本内核只支持 HTTP(S)）时，补一组默认 HTTP tracker，
+     * 否则一定取不到 peer，BEP-9 元数据永远拉不下来。
+     */
+    public boolean ensureHttpTrackers() {
+        for (String t : trackers) {
+            if (t != null && t.toLowerCase(Locale.US).startsWith("http")) return false;
+        }
+        int n = 0;
+        for (String d : Tracker.DEFAULT_TRACKERS) {
+            if (!trackers.contains(d)) {
+                trackers.add(d);
+                n++;
+            }
+        }
+        return n > 0;
     }
 }

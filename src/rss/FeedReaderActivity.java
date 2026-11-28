@@ -154,18 +154,21 @@ public class FeedReaderActivity extends BaseActivity {
     /** @js: 规则：在页面上下文执行，取返回值（字符串 / 元素 / 元素集合） */
     private void loadByJs(String js) {
         titleView.setText(TextUtils.isEmpty(article.title) ? article.link : article.title);
-        String cached = FeedState.readCache(this, article.link);
-        if (!TextUtils.isEmpty(cached)) {
-            String html = ContentExtractor.wrap(cached, null, article.link,
-                    VieYApp.isDarkMode(this), textZoom);
-            web.loadDataWithBaseURL(article.link, html, "text/html", "UTF-8", null);
-            Toast.makeText(this, "离线缓存，后台更新中", Toast.LENGTH_SHORT).show();
-        }
+        android.util.Log.i("viey-rss", "@js 开始 页面=" + article.link + " 规则长=" + js.length());
+        final java.util.concurrent.atomic.AtomicBoolean evalStarted =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+        final java.util.concurrent.atomic.AtomicBoolean gotResult =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
         // @js: 规则需要在页面上下文执行，临时开启 JS；取到结果后立即关闭再渲染
         web.getSettings().setJavaScriptEnabled(true);
         web.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
+                if (!evalStarted.compareAndSet(false, true)) {
+                    android.util.Log.i("viey-rss", "@js onPageFinished 重复，忽略 " + url);
+                    return;
+                }
+                android.util.Log.i("viey-rss", "@js onPageFinished 开始 eval " + url);
                 // eval 语义对齐 Legado：多语句脚本返回最后一个表达式的值
                 String expr = "(function(){try{var r=eval(" + org.json.JSONObject.quote(js) + ");"
                         + "if(r==null)return '';"
@@ -174,8 +177,9 @@ public class FeedReaderActivity extends BaseActivity {
                         + "if(typeof r.length==='number'){var s='';for(var i=0;i<r.length;i++){var e=r[i];"
                         + "s+=((e&&e.innerHTML!==undefined)?e.innerHTML:String(e));}return s;}"
                         + "var t=(r.innerText!==undefined)?r.innerText:String(r);return t;"
-                        + "}catch(e){return 'ERRJS:'+e.message;}})()";
+                        + "}catch(e){return 'ERRJS:'+(e&&e.message?e.message:e);}})()";
                 view.evaluateJavascript(expr, value -> {
+                    gotResult.set(true);
                     view.getSettings().setJavaScriptEnabled(false);
                     String text;
                     try {
@@ -184,6 +188,9 @@ public class FeedReaderActivity extends BaseActivity {
                     } catch (Exception e) {
                         text = value;
                     }
+                    android.util.Log.i("viey-rss", "@js 结果 len=" + (text == null ? -1 : text.length())
+                            + " head=" + (text == null ? "null"
+                            : text.substring(0, Math.min(40, text.length()))));
                     if (value == null || "null".equals(value)) {
                         render(null, "JS 规则返回空（检查规则是否能取到元素）");
                         return;
@@ -204,10 +211,29 @@ public class FeedReaderActivity extends BaseActivity {
             }
         });
         web.loadUrl(article.link);
+        // 兜底：15s 内没有结果就明确提示，不再留白屏
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            if (gotResult.get()) return;
+            android.util.Log.w("viey-rss", "@js 超时未回调 evalStarted=" + evalStarted.get());
+            String cached = FeedState.readCache(this, article.link);
+            if (!TextUtils.isEmpty(cached)) {
+                web.setWebViewClient(new WebViewClient());
+                String html = ContentExtractor.wrap(cached, null, article.link,
+                        VieYApp.isDarkMode(this), textZoom);
+                web.loadDataWithBaseURL(article.link, html, "text/html", "UTF-8", null);
+            } else {
+                render(null, "JS 规则未在 15 秒内返回（页面可能加载失败或一直有跳转）\n"
+                        + "可点右上角↗ 直接看原网页");
+            }
+        }, 15000);
     }
 
     private void render(String body, String msg) {
-        if (web != null) web.getSettings().setJavaScriptEnabled(false);
+        if (web != null) {
+            // 换回普通 client，避免 loadData 再次触发 @js 的 onPageFinished 复算
+            web.setWebViewClient(new WebViewClient());
+            web.getSettings().setJavaScriptEnabled(false);
+        }
         String html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
                 + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                 + "<style>body{padding:24px;font:15px/1.8 sans-serif;color:"

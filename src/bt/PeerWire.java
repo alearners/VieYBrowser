@@ -156,13 +156,16 @@ public class PeerWire implements Closeable {
         while (System.currentTimeMillis() < deadline) {
             Msg m = read();
             if (m.id == 20 && m.payload.length > 1 && m.payload[0] == 1) {
-                int dictEnd = dictEnd(m.payload, 1);
-                Map<String, Object> o = asMap(slice(m.payload, 1, dictEnd));
+                // dictEnd 返回的是"dict 之后第一个字节"的绝对偏移（已吃掉结尾 e）
+                int headEnd = dictEnd(m.payload, 1);
+                if (headEnd <= 0 || headEnd >= m.payload.length) continue;
+                Map<String, Object> o = asMap(slice(m.payload, 1, headEnd));
                 long mt = Bencode.num(o.get("msg_type"));
                 long pc = Bencode.num(o.get("piece"));
                 if (pc != index) continue;
                 if (mt != 1) throw new Exception("metadata 请求被拒");
-                byte[] body = slice(m.payload, 1 + dictEnd, m.payload.length);
+                byte[] body = slice(m.payload, headEnd, m.payload.length);
+                if (body.length == 0) throw new Exception("metadata 片空");
                 return body;
             }
         }
@@ -170,16 +173,23 @@ public class PeerWire implements Closeable {
     }
 
     /** 下载整片：自动 request 16KB 块并拼接 */
+    /** 声明自己没有任一片（全 0 bitfield）。不少客户端要看到 bitfield 才会给我们 unchoke */
+    public void sendBitfield(int pieceCount) throws Exception {
+        sendRaw(5, new byte[(pieceCount + 7) / 8]);
+    }
+
     public byte[] downloadPiece(int index, long pieceLen) throws Exception {
         sendRaw(2, null); // interested
-        long deadline = System.currentTimeMillis() + 25000;
+        // 连接刚建立时对方默认是 choke 状态、会先发一条 id=0，那是状态同步不是拒绝。
+        // 老代码把它当拒绝直接抛，导致永远拿不到数据。
+        long deadline = System.currentTimeMillis() + 30000;
         boolean unchoked = false;
         while (System.currentTimeMillis() < deadline && !unchoked) {
             Msg m = read();
             if (m.id == 1) unchoked = true;
-            else if (m.id == 0) throw new Exception("对端 choke");
+            else if (m.id == 0 || m.id == 6 || m.id == 4 || m.id == 5 || m.id == -1) continue;
         }
-        if (!unchoked) throw new Exception("等待 unchoke 超时");
+        if (!unchoked) throw new Exception("对端未 unchoke");
 
         byte[] buf = new byte[(int) pieceLen];
         boolean[] got = new boolean[(int) ((pieceLen + BLOCK - 1) / BLOCK)];
@@ -218,15 +228,27 @@ public class PeerWire implements Closeable {
     }
 
     private void request(int index, int begin, int len) throws Exception {
-        ByteArrayOutputStream bo = new ByteArrayOutputStream();
-        bo.write(int3(index));
-        bo.write(int3(begin));
-        bo.write(int3(len));
-        sendRaw(6, bo.toByteArray());
+        sendRaw(6, reqPayload(index, begin, len));
     }
 
-    private static byte[] int3(int v) {
-        return new byte[]{(byte) (v >> 16), (byte) (v >> 8), (byte) v};
+    /**
+     * BEP-3 request payload：index / begin / length 各 4 字节大端，共 12 字节。
+     * 老代码写成了 3 字节（int3），对端按 12 字节解析必然错位并 RST 连接，
+     * 表现就是每一片都 "Broken pipe"、进度永远 0。
+     */
+    static byte[] reqPayload(int index, int begin, int len) {
+        byte[] p = new byte[12];
+        putInt(p, 0, index);
+        putInt(p, 4, begin);
+        putInt(p, 8, len);
+        return p;
+    }
+
+    private static void putInt(byte[] b, int off, int v) {
+        b[off] = (byte) (v >> 24);
+        b[off + 1] = (byte) (v >> 16);
+        b[off + 2] = (byte) (v >> 8);
+        b[off + 3] = (byte) v;
     }
 
     private static int readInt(byte[] b, int off) {

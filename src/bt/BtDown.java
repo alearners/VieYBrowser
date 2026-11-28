@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -39,6 +38,7 @@ public class BtDown {
     private final Magnet magnet;      // 可为空（.torrent 直接给）
     private final byte[] metainfo;    // 可为空（magnet 走 BEP-9）
     private Torrent tor;
+    private volatile Tracker.Peer metaPeer;   // BEP-9 拉到元数据的 peer，下载阶段优先用
     private final int maxPeers;
     private volatile boolean paused = false;
     private volatile String lastError = "无可用 peer";
@@ -52,7 +52,6 @@ public class BtDown {
     private File[] rafs;
     private RandomAccessFile[] handles;
     private final List<Integer> remain = Collections.synchronizedList(new ArrayList<>());
-    private final AtomicInteger claimed = new AtomicInteger(0);
 
     public BtDown(Context c, String torrentText, int maxPeers) throws Exception {
         this.ctx = c.getApplicationContext();
@@ -60,6 +59,8 @@ public class BtDown {
         String s = torrentText == null ? "" : torrentText.trim();
         if (s.toLowerCase(Locale.US).startsWith("magnet:")) {
             magnet = Magnet.parse(s);
+            boolean added = magnet.ensureHttpTrackers();
+            if (added) Log.i(TAG, "magnet 无 HTTP tracker，已补默认 " + magnet.trackers.size() + " 个");
             metainfo = null;
         } else {
             magnet = null;
@@ -138,26 +139,57 @@ public class BtDown {
     // ---------- 元数据 ----------
 
     private Torrent fetchTorrentViaMetadata(Cb cb) throws Exception {
-        List<Tracker.Peer> peers = announceAll(0L, 1);
-        if (peers.isEmpty()) throw new Exception("tracker 没有返回 peer，magnet 无法取元数据");
-        String peerId = Tracker.peerId();
-        for (Tracker.Peer p : peers) {
-            if (paused) throw new Exception("已取消");
-            PeerWire w = new PeerWire(p.host, p.port, magnet.infoHash(), peerId);
-            try {
-                w.connect();
-                byte[] info = w.fetchMetadata();
-                Torrent t = Torrent.fromInfo(info, magnet.trackers, magnet.displayName);
-                cb.onProgress(0, t.totalLength, "元数据到手：" + t.name + " / " + t.pieceCount() + " 片");
-                Log.i(TAG, "metadata ok from " + p.key() + " name=" + t.name);
-                return t;
-            } catch (Exception e) {
-                Log.w(TAG, "metadata " + p.key() + " 失败：" + e.getMessage());
-            } finally {
-                w.close();
-            }
+        List<Tracker.Peer> peers = announceAll(1L, 1);
+        if (peers.isEmpty()) {
+            throw new Exception("tracker 没有返回 peer（已试 " + magnet.trackers.size() + " 个 tracker，"
+                    + "本内核不做 DHT/UDP tracker，公开 HTTP tracker 多数已失效）");
         }
-        throw new Exception("所有 peer 都没给出元数据");
+        cb.onProgress(0, magnet.exactLength, "拿到 " + peers.size() + " 个 peer，并发拉元数据（BEP-9）");
+        final String peerId = Tracker.peerId();
+        int n = Math.min(peers.size(), 40);
+        java.util.concurrent.ExecutorService es = java.util.concurrent.Executors.newFixedThreadPool(4);
+        java.util.concurrent.CompletionService<Torrent> cs =
+                new java.util.concurrent.ExecutorCompletionService<>(es);
+        for (int i = 0; i < n; i++) {
+            final Tracker.Peer p = peers.get(i);
+            cs.submit(() -> {
+                if (paused) throw new Exception("已取消");
+                PeerWire w = new PeerWire(p.host, p.port, magnet.infoHash(), peerId);
+                try {
+                    w.connect();
+                    byte[] info = w.fetchMetadata();
+                    Torrent t = Torrent.fromInfo(info, magnet.trackers, magnet.displayName);
+                    metaPeer = p;
+                    Log.i(TAG, "metadata ok from " + p.key() + " name=" + t.name);
+                    return t;
+                } finally {
+                    w.close();
+                }
+            });
+        }
+        es.shutdown();
+        Exception last = null;
+        long deadline = System.currentTimeMillis() + 120000L;
+        try {
+            for (int i = 0; i < n; i++) {
+                long remain = deadline - System.currentTimeMillis();
+                if (remain <= 0) break;
+                java.util.concurrent.Future<Torrent> f =
+                        cs.poll(remain, java.util.concurrent.TimeUnit.MILLISECONDS);
+                if (f == null) break;
+                try {
+                    Torrent t = f.get();
+                    cb.onProgress(0, t.totalLength, "元数据到手：" + t.name + " / " + t.pieceCount() + " 片");
+                    return t;
+                } catch (Exception e) {
+                    last = e;
+                    Log.w(TAG, "metadata 失败：" + e.getMessage());
+                }
+            }
+        } finally {
+            es.shutdownNow();
+        }
+        throw new Exception("所有 peer 都没给出元数据" + (last != null ? "（最后：" + last.getMessage() + "）" : ""));
     }
 
     private List<Tracker.Peer> announceAll(long left, int event) {
@@ -285,32 +317,80 @@ public class BtDown {
 
     // ---------- 调度 ----------
 
+    /**
+     * peer 调度：滚动补池。tracker 一次给的 50 个 peer 里往往大半连不上，
+     * 老实现只取前 maxPeers 个，前 8 个全挂就直接失败；这里改成
+     * 失败即换下一个、池空（或不够并发）就重新 announce，直到全部试过或超时。
+     */
     private void run(Cb cb) throws Exception {
         if (remain.isEmpty()) return;
-        long left = (tor.totalLength - doneBytes.get());
-        List<Tracker.Peer> peers = announceAll(left, 1);
-        if (peers.isEmpty()) {
-            if (!tor.webSeeds.isEmpty()) {
-                webSeedDownload(cb);
-                return;
-            }
-            throw new Exception("tracker 无 peer（可能已无做种），且该种子没有 HTTP 种子(url-list)");
-        }
-        String peerId = Tracker.peerId();
-        claimed.set(0);
-        int threads = Math.min(maxPeers, Math.max(1, peers.size()));
-        final List<Exception> errs = Collections.synchronizedList(new ArrayList<>());
-        List<Thread> ts = new ArrayList<>();
+        final String peerId = Tracker.peerId();
         final long[] lastTick = {System.currentTimeMillis()};
         final long[] lastBytes = {doneBytes.get()};
-        for (int i = 0; i < threads; i++) {
-            final Tracker.Peer p = peers.get(i % peers.size());
-            Thread th = new Thread(() -> peerLoop(p, peerId, cb, lastTick, lastBytes), "peer-" + p.key());
+        final java.util.List<Tracker.Peer> pool = new java.util.ArrayList<>();
+        final java.util.Set<String> tried =
+                java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
+        final Tracker.Peer first = metaPeer;
+        if (first != null) {
+            tried.add(first.key());
+            pool.add(first);
+        }
+        List<Thread> ts = new ArrayList<>();
+        int round = 0;
+        long t0 = System.currentTimeMillis();
+        boolean announced = false;
+        while (!allDone() && !paused) {
+            java.util.Iterator<Thread> it = ts.iterator();
+            while (it.hasNext()) {
+                if (!it.next().isAlive()) it.remove();
+            }
+            if (ts.size() >= maxPeers) {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                }
+                continue;
+            }
+            if (pool.isEmpty()) {
+                if (round >= 8 || System.currentTimeMillis() - t0 > 40L * 60000L) break;
+                long left = Math.max(1, tor.totalLength - doneBytes.get());
+                List<Tracker.Peer> got = announceAll(left, round == 0 ? 1 : 0);
+                announced = true;
+                synchronized (tried) {
+                    for (Tracker.Peer p : got) if (tried.add(p.key())) pool.add(p);
+                }
+                round++;
+                if (pool.isEmpty()) {
+                    if (ts.isEmpty()) {
+                        if (round >= 8) break;
+                        try {
+                            Thread.sleep(1200);
+                        } catch (InterruptedException ignored) {
+                        }
+                    }
+                    continue;
+                }
+            }
+            Tracker.Peer p = pool.remove(0);
+            final Tracker.Peer fp = p;
+            Thread th = new Thread(() -> peerLoop(fp, peerId, cb, lastTick, lastBytes), "peer-" + fp.key());
             ts.add(th);
             th.start();
         }
-        for (Thread th : ts) th.join();
-        if (!allDone() && errs.isEmpty()) lastError = "peer 全部退出但未完成";
+        for (Thread th : ts) {
+            try {
+                th.join(3000);
+            } catch (InterruptedException ignored) {
+            }
+        }
+        if (!allDone()) {
+            if (!announced && !tor.webSeeds.isEmpty()) {
+                webSeedDownload(cb);
+                return;
+            }
+            lastError = "peer 全部退出但未完成（试过 " + tried.size() + " 个 peer / " + round + " 轮 announce"
+                    + (paused ? "，已暂停" : "") + "）";
+        }
     }
 
     /** BEP-19 HTTP 种子：无 peer 时按 Range 逐片取，仍然走 piece SHA-1 校验 */
@@ -416,8 +496,10 @@ public class BtDown {
         try {
             w = new PeerWire(p.host, p.port, tor.infoHash, peerId);
             w.connect();
+            w.sendBitfield(tor.pieceCount());
             live.add(w);
             Log.i(TAG, "peer 接入 " + p.key());
+            int fails = 0;
             while (!paused && !remain.isEmpty()) {
                 int index = nextPiece();
                 if (index < 0) return;
@@ -444,13 +526,16 @@ public class BtDown {
                         save();
                     }
                 } catch (Exception e) {
-                    Log.w(TAG, "peer " + p.key() + " 取片 " + index + " 失败：" + e.getMessage());
-                    // 记录最后一个错误，若该片没放回则放回
-                    lastError = e.getMessage();
+                    String m = e.getMessage() == null ? "" : e.getMessage();
+                    Log.w(TAG, "peer " + p.key() + " 取片 " + index + " 失败：" + m);
+                    lastError = m;
                     synchronized (remain) {
                         if (!remain.contains(index)) remain.add(index);
                     }
-                    if (e.getMessage() != null && e.getMessage().contains("连接断开")) break;
+                    fails++;
+                    // 连接级错误直接放弃该 peer，避免同一断链上疯狂重试刷日志
+                    if (fails >= 3 || m.contains("连接断开") || m.contains("Broken pipe")
+                            || m.contains("choke") || m.contains("超时") || m.contains("Connection reset")) break;
                 }
             }
         } catch (Exception e) {

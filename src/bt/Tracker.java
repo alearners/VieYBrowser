@@ -20,6 +20,13 @@ public class Tracker {
     private static final String TAG = "viey-bt";
     private static final String UA = "VieY/0.9 (Android)";
 
+    /** magnet 缺 tr 时补齐的公开 HTTP(S) tracker（2026-11 实测 opentrackr 有种子） */
+    public static final String[] DEFAULT_TRACKERS = {
+            "http://tracker.opentrackr.org:1337/announce",
+            "http://open.tracker.cl:1337/announce",
+            "http://tracker.torrent.eu.org/announce",
+    };
+
     public static class Peer {
         public String host;
         public int port;
@@ -45,7 +52,11 @@ public class Tracker {
     /** 可选：返回 {"ok":bool,"msg":String,"peers":List<Peer>} ；用 List 直接返回 peers，失败抛异常 */
     public static List<Peer> announce(String trackerUrl, byte[] infoHash, String peerId,
                                       int port, long left, int event) throws Exception {
-        String base = trackerUrl;
+        if (trackerUrl == null) throw new Exception("空 tracker");
+        String low = trackerUrl.trim().toLowerCase(Locale.US);
+        if (low.startsWith("udp://")) throw new Exception("暂不支持 UDP tracker");
+        if (!low.startsWith("http://") && !low.startsWith("https://")) throw new Exception("非 HTTP tracker");
+        String base = trackerUrl.trim();
         StringBuilder qs = new StringBuilder(base.contains("?") ? "&" : "?");
         qs.append("info_hash=").append(percent(infoHash))
                 .append("&peer_id=").append(percent(peerId.getBytes(StandardCharsets.UTF_8)))

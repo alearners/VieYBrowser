@@ -73,6 +73,35 @@ public class ContentExtractor {
     }
 
     /** 生成完整可渲染页面：正文 + 排版样式（暗色/字号由外部决定） */
+    /**
+     * 阅读页净化：抽出 body 内层，去掉 script/style/link/iframe/form 和 display:none 容器。
+     * 不净化的话，@js: 返回整页 body.innerHTML 时会把原站 CSS 一起塞进阅读页（常见的 body{display:none}
+     * 或入场动画会导致整页白屏）。
+     */
+    public static String clean(String html) {
+        if (TextUtils.isEmpty(html)) return "";
+        String s = html;
+        String low = s.toLowerCase(java.util.Locale.US);
+        int b = low.indexOf("<body");
+        if (b >= 0) {
+            int gt = s.indexOf('>', b);
+            int end = low.lastIndexOf("</body>");
+            if (gt > 0) s = end > gt ? s.substring(gt + 1, end) : s.substring(gt + 1);
+        }
+        Document d = Jsoup.parseBodyFragment(s);
+        d.outputSettings().prettyPrint(false);
+        d.select("script,style,link,meta,iframe,noscript,form,input,button,textarea,object,embed")
+                .remove();
+        for (Element e : new ArrayList<>(d.select("[style]"))) {
+            String st = e.attr("style").toLowerCase(java.util.Locale.US).replace(" ", "");
+            if (st.contains("display:none") || st.contains("visibility:hidden") || st.contains("opacity:0")) {
+                e.remove();
+            }
+        }
+        d.select("[hidden]").remove();
+        return d.body().html();
+    }
+
     public static String wrap(String bodyHtml, String title, String baseUrl, boolean dark, int textZoom) {
         StringBuilder sb = new StringBuilder();
         sb.append("<!DOCTYPE html><html><head><meta charset=\"utf-8\">");
@@ -98,7 +127,7 @@ public class ContentExtractor {
         if (!TextUtils.isEmpty(title)) {
             sb.append("<h1>").append(escape(title)).append("</h1>");
         }
-        sb.append(bodyHtml == null ? "" : bodyHtml);
+        sb.append(bodyHtml == null ? "" : clean(bodyHtml));
         sb.append("</body></html>");
         return sb.toString();
     }
