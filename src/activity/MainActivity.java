@@ -79,6 +79,7 @@ public class MainActivity extends BaseActivity {
 		
 		turnDark(isDarkMode);
 		setupListeners();
+		try { AdBlock.maybeAutoUpdate(this); } catch (Throwable ignored) {}
 		String urlToLoad = VieYApp.getHomeUrl(this);
 		if (getIntent() != null && getIntent().getData() != null) {
 			urlToLoad = getIntent().getData().toString();
@@ -1165,6 +1166,11 @@ public class MainActivity extends BaseActivity {
 			bottomSheetDialog.dismiss();
 			AiActivity.open(MainActivity.this);
 		}));
+		menuList.add(new MenuGridItem(R.drawable.ic_rss, "订阅 / 阅读", ()->{
+			Intent intent = new Intent(MainActivity.this, FeedActivity.class);
+			startActivity(intent);
+			bottomSheetDialog.dismiss();
+		}));
 		menuList.add(new MenuGridItem(R.drawable.ic_search, "广告拦截", ()->{
 			bottomSheetDialog.dismiss();
 			showAdBlockPanel();
@@ -1216,8 +1222,13 @@ public class MainActivity extends BaseActivity {
 
 	private void showAdBlockPanel() {
 		boolean on = AdBlock.enabled(this);
+		WebViey web = getCurrentWeb();
+		String page = web == null ? null : web.getUrl();
+		boolean siteOff = page != null && AdBlock.siteOff(this, page);
+		String hostNow = page == null ? "无" : page.replaceAll("^(\\w+://)?([^/:]+).*$", "$2");
 		String msg = "状态：" + (on ? "已开启" : "已关闭")
-			+ "\n规则：" + AdBlock.ruleCount(this) + " 条"
+			+ "\n本站：" + hostNow + (siteOff ? "（暂停拦截）" : "（正常拦截）")
+			+ "\n规则：" + AdBlock.ruleCount(this) + " 条（含元素隐藏）"
 			+ "\n订阅：" + (AdBlock.subs(this).trim().isEmpty() ? "未设置" : AdBlock.subs(this).trim().split("\\n").length + " 个地址")
 			+ "\n已拦截：" + AdBlock.hits(this) + " 次";
 		new android.app.AlertDialog.Builder(this)
@@ -1232,8 +1243,13 @@ public class MainActivity extends BaseActivity {
 					getCurrentWeb().reload();
 				}
 			})
-			.setNeutralButton("规则与订阅", (d, w) -> startActivity(new android.content.Intent(this, SettingsActivity.class)))
-			.setNegativeButton("取消", null)
+			.setNeutralButton(siteOff ? "恢复本站拦截" : "本站暂停拦截", (d, w) -> {
+				if (page == null) return;
+				boolean off = AdBlock.toggleSite(this, page);
+				Toast.makeText(this, off ? "本站已暂停拦截" : "本站已恢复拦截", Toast.LENGTH_SHORT).show();
+				if (getCurrentWeb() != null) getCurrentWeb().reload();
+			})
+			.setNegativeButton("规则与订阅", (d, w) -> startActivity(new android.content.Intent(this, SettingsActivity.class)))
 			.show();
 	}
 

@@ -480,6 +480,10 @@ public class WebViey extends WebView {
 			@Override
 			public void onPageFinished(WebView view, String url) {
 				injectJs();
+				try {
+					String adJs = AdBlock.hideScript(getContext(), url);
+					if (adJs != null && adJs.length() > 0) view.evaluateJavascript(adJs, null);
+				} catch (Throwable ignored) {}
 				if (VirtualMouse.isOn(getContext())) view.evaluateJavascript(VirtualMouse.SCRIPT, null);
 				if (!i.canRun(url)) {
 					FontInject.inject(view, url);

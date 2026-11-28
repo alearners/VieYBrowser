@@ -186,6 +186,14 @@ public class SettingsActivity extends BaseActivity {
 		addItem("拦截规则（" + AdBlock.ruleCount(this) + " 条）", v -> showAdBlockRulesDialog());
 		addItem("规则订阅地址（每行一个）", v -> showAdBlockSubsDialog());
 		addItem("立即更新订阅规则", v -> updateAdBlockSubs());
+		addSwitchItem("订阅自动更新（超 3 天首次启动时拉取）", AdBlock.autoUpdate(this), (v, is) -> AdBlock.setAutoUpdate(this, is));
+		addValueItem("已暂停拦截的站点", v -> {
+			new android.app.AlertDialog.Builder(this)
+				.setTitle("站点白名单")
+				.setMessage(AdBlock.offSiteCount(this) == 0 ? "暂无" : "共 " + AdBlock.offSiteCount(this) + " 个站点（在广告拦截面板里按站点切换）")
+				.setNegativeButton("关闭", null)
+				.show();
+		}).setText(AdBlock.offSiteCount(this) + " 个");
 		addValueItem("已拦截请求", v -> showAdBlockStats()).setText(AdBlock.hits(this) + " 次");
 
 		if (OpLevel.get(this) >= OpLevel.POWER) {
@@ -1043,6 +1051,9 @@ public class SettingsActivity extends BaseActivity {
 		new android.app.AlertDialog.Builder(this)
 			.setTitle("广告拦截统计")
 			.setMessage("已拦截请求：" + AdBlock.hits(this) + " 次\n规则条数：" + AdBlock.ruleCount(this)
+				+ "\n订阅缓存：" + (AdBlock.subsCache(this).isEmpty() ? "空" : (AdBlock.subsCache(this).length() / 1024) + " KB")
+				+ "\n站点白名单：" + AdBlock.offSiteCount(this) + " 个"
+				+ "\n上次订阅更新：" + (AdBlock.lastUpdate(this) == 0 ? "从未" : new java.text.SimpleDateFormat("yy-MM-dd HH:mm").format(new java.util.Date(AdBlock.lastUpdate(this))))
 				+ "\n状态：" + (AdBlock.enabled(this) ? "已开启" : "已关闭"))
 			.setPositiveButton("清零", (d, w) -> {
 				AdBlock.resetHits(this);
