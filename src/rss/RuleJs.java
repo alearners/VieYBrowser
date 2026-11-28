@@ -64,7 +64,7 @@ public class RuleJs {
         long t0 = System.currentTimeMillis();
         List<FeedParser.Article> list = parse(c, s, s.url, html);
         long ms = System.currentTimeMillis() - t0;
-        if (list.isEmpty()) return "未解析到条目（开关关闭或沙箱失败，耗时 " + ms + "ms）";
+        if (list.isEmpty()) return "未解析到条目，耗时 " + ms + "ms" + (lastError.isEmpty() ? "（无脚本错误，检查开关与规则）" : "；脚本异常：" + lastError);
         FeedParser.Article a = list.get(0);
         return "解析 " + list.size() + " 条，耗时 " + ms + "ms；首条：" + a.title + " → " + a.link;
     }
@@ -81,6 +81,8 @@ public class RuleJs {
         final List<FeedParser.Article> out = new ArrayList<>();
         if (!enabled(c) || html == null || html.length() == 0) return out;
 
+        lastError = "";
+        android.util.Log.i("viey-rulejs", "parse 开始 html=" + html.length() + " url=" + url);
         final CountDownLatch latch = new CountDownLatch(1);
         final Handler ui = new Handler(Looper.getMainLooper());
         final String script = buildScript(src, url);
@@ -89,6 +91,7 @@ public class RuleJs {
             WebView wv = null;
             try {
                 wv = new WebView(c.getApplicationContext());
+                android.util.Log.i("viey-rulejs", "WebView 已创建");
                 WebSettings ws = wv.getSettings();
                 ws.setJavaScriptEnabled(true);
                 ws.setBlockNetworkLoads(false);
@@ -103,8 +106,10 @@ public class RuleJs {
                     public void onPageFinished(WebView view, String u) {
                         if (done[0]) return;
                         done[0] = true;
+                        android.util.Log.i("viey-rulejs", "onPageFinished 脚本长度 " + script.length());
                         try {
                             view.evaluateJavascript(script, value -> {
+                                android.util.Log.i("viey-rulejs", "原始结果 " + (value == null ? "null" : value.substring(0, Math.min(200, value.length()))));
                                 try {
                                     collect(value, out);
                                 } catch (Throwable t) {
@@ -137,12 +142,20 @@ public class RuleJs {
         return out;
     }
 
+    public static String lastError = "";
+
     private static void collect(String value, List<FeedParser.Article> out) throws org.json.JSONException {
         if (value == null) return;
         String s = value.trim();
         if (s.startsWith("\"")) {
             // evaluateJavascript 会再包一层 JSON 字符串
             s = new org.json.JSONTokener(s).nextValue().toString();
+        }
+        if (s.startsWith("{")) {
+            JSONObject err = new JSONObject(s);
+            lastError = err.optString("error", s);
+            android.util.Log.w("viey-rulejs", "脚本异常：" + lastError);
+            return;
         }
         JSONArray arr = new JSONArray(s);
         for (int k = 0; k < arr.length(); k++) {
@@ -175,6 +188,7 @@ public class RuleJs {
         String lib = src.jsLib == null ? "" : src.jsLib;
 
         return "(function(){\n"
+            + "try{\n"
             + "var LIBS = " + jsStr(lib) + ";\n"
             + "var RULES = " + rulesJson + ";\n"
             + "var SRC = " + srcJson + ";\n"
@@ -279,6 +293,7 @@ public class RuleJs {
             + "  return JSON.stringify(out);\n"
             + "}\n"
             + "return finish();\n"
+            + "}catch(ERR){ return JSON.stringify({error:String((ERR&&ERR.stack)||ERR)}); }\n"
             + "})()";
     }
 
