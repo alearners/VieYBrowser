@@ -746,8 +746,35 @@ public class AdBlock {
 	}
 
 	private static void hit(Context c) {
-		if (pending.incrementAndGet() % 8 != 0) return;
-		flush(c);
+		int n = pending.incrementAndGet();
+		if (n >= 8) {
+			flush(c);
+			return;
+		}
+		// 不足 8 次也延迟落盘，避免进程被杀时这段尾巴丢掉（统计会永远停在 8 的整数倍）
+		scheduleFlush(c);
+	}
+
+	private static volatile boolean flushScheduled = false;
+
+	private static void scheduleFlush(final Context c) {
+		if (flushScheduled) return;
+		flushScheduled = true;
+		try {
+			final Context app = c.getApplicationContext() == null ? c : c.getApplicationContext();
+			new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
+				@Override
+				public void run() {
+					flushScheduled = false;
+					try {
+						flush(app);
+					} catch (Throwable ignored) {
+					}
+				}
+			}, 1500);
+		} catch (Throwable t) {
+			flushScheduled = false;
+		}
 	}
 
 	private static void flush(Context c) {

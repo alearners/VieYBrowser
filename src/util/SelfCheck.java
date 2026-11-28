@@ -131,6 +131,11 @@ public class SelfCheck {
 		check(b, "拦截计数可读", AdBlock.hits(c) >= 0, "");
 		check(b, "站点暂停列表可读", AdBlock.offSiteCount(c) >= 0, "");
 		check(b, "订阅地址/手动规则可读", AdBlock.rules(c) != null && AdBlock.subs(c) != null, "");
+
+		// 运行时统计（开关状态 + 真实拦截累计），方便抓取日志时一眼看到
+		b.append("（广告拦截）开关 ").append(AdBlock.enabled(c) ? "ON" : "OFF")
+			.append(" / 生效规则 ").append(AdBlock.ruleCount(c))
+			.append(" 条 / 累计拦截 ").append(AdBlock.hits(c)).append(" 次\n");
 	}
 
 	// ---------------- RSS ----------------
