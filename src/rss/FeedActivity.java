@@ -164,7 +164,40 @@ public class FeedActivity extends BaseActivity {
     }
 
     
+    /** 导入入口：系统选择器 / 直接给设备路径（新文件常未被 MediaStore 索引） */
     private void pickImport() {
+        new AlertDialog.Builder(this)
+            .setTitle("导入订阅源")
+            .setItems(new String[]{"用系统文件选择器", "从设备路径导入（如 /sdcard/Download/rss_src.json）"}, (d, w) -> {
+                if (w == 1) importFromPath();
+                else pickImportDocument();
+            })
+            .show();
+    }
+
+    private void importFromPath() {
+        EditText et = new EditText(this);
+        et.setSingleLine(true);
+        et.setText("/sdcard/Download/rss_src.json");
+        et.setTextSize(13);
+        new AlertDialog.Builder(this)
+            .setTitle("从路径导入")
+            .setView(et)
+            .setPositiveButton("导入", (d, w) -> {
+                String path = et.getText().toString().trim();
+                try (InputStream in = new java.io.FileInputStream(path)) {
+                    int added = FeedStore.importFrom(this, in);
+                    reload();
+                    Toast.makeText(this, "导入完成，新增 " + added + " 个订阅源", Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    Toast.makeText(this, "导入失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+                }
+            })
+            .setNegativeButton("取消", null)
+            .show();
+    }
+
+    private void pickImportDocument() {
         Intent it = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         it.addCategory(Intent.CATEGORY_OPENABLE);
         it.setType("*/*");
