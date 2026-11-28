@@ -1,330 +1,262 @@
-# VieYBrowser - A Smolnet Browser for Android
+# VieY Browser
 
-![VieY Browser Icon](/icon.png)
+A lightweight Android browser for smolnet
 
-[简体中文](/README_zh.md) | English
+English | [简体中文](README_zh.md)
 
-[VieY Browser Official Website](https://palhube666.wodemo.net/) / [Download Link ①](https://dmpap.lanzouw.com/b02dc84ch) / [Download Link ②](https://www.123pan.com/s/UML9jv-fk4bh.html) / [Download Link ③](https://t.me/Kawaii_V)
+- Project page: <https://palhube666.wodemo.net/>
+- Downloads: [Lanzou Cloud](https://dmpap.lanzouw.com/b02dc84ch) · [123 Cloud](https://www.123pan.com/s/UML9jv-fk4bh.html) · [Telegram](https://t.me/Kawaii_V)
+- Current version: 0.11.4-dev, package size approximately 3.2 MB
+
+---
 
 ## 1. Project Overview
 
-Welcome to download / use Vie Browser
+VieY Browser is an open-source Android browser for smolnet protocols, initiated by Daimao Piao A Piao. It derives from the author's earlier project Vie, keeps the capabilities related to small-network browsing, removes modules unrelated to the browsing core, and adds independently developed features including feed reading, multi-source downloading and BitTorrent.
 
-VieY Browser is an open-source lightweight Android browser developed by 呆毛飘啊飘 (Daimao Piao A Piao).
-
-VieY is a fork of my Vie project, which removes superfluous features while retaining and enhancing functionality related to the small net (smolnet).
-
-The installation package is approximately 10 MB in size.
+The project is written in Java, supports Android 5.0 (API 21) and above, and targets Android 14 (API 34). All functionality is delivered in a single package without external runtimes.
 
 ---
-
 
 ## 2. Features
 
-- Supports smolnet identity/client certificates for requests
-- Supports normal web page browsing
-- Pull-down to refresh pages
-- Long press on bottom action bar for shortcut functions
+### 2.1 Browsing Core
+
+- General web browsing over HTTP and HTTPS
+- Pull-to-refresh
+- Long-press shortcuts on the bottom action bar
 - Full-screen video playback
-- Supports web page use of location, microphone, and camera
-- Supports external applications accessing internal files via local storage
-- Minimum support for Android 5
+- Page access to location, microphone and camera
+- External applications may access internal files through local storage
+- Built-in run log, categorized by page, resource, script, MQTT and FTP
+- Safe browsing interception with a warning page offering return or continue
+- Image viewer: tap an image to enlarge, tap again to dismiss
 
-### VieY 自研扩展（0.8.6-dev）
+### 2.2 smolnet Identity and Protocols
 
-- 订阅：RSS/Atom 源管理，兼容阅读 App(Legado) `rssSources.json` 字段，支持导入/导出 `backup.zip` 订阅备份
-- CSP 安全网页字体：`shouldInterceptRequest` 返回同源 `/__vie__/font.ttf` + `font.js`，CSP 白名单内加载，规避 `zhihu.com/appview/special` 这类拦截
-- 用户脚本插件：`.user.js` 导入（粘贴 / URL）、`@match`/`@include` 匹配、启停、脚本市场地址可配
-- 多源多进程下载（替代 eD2k 内核，不引入完整 eMule）：HTTP(S) Range 分段、每任务多连接（默认 8，可配 1–16）、多镜像自动换源、动态对半分片（剩余 >4MB 且未达连接上限）、`.part` + `.part.state` 逐段续传、可选 SHA-256 校验后改名
-- 下载独立进程：`DlService` 声明 `android:process=":dl"` + `foregroundServiceType="dataSync"`，前台通知进度，主进程与下载进程仅通过 `filesDir/dl_task.json`（tmp→rename 原子写）通信，UI 卡死/回收不影响下载
-- 容错：尺寸探测只认 `206 + Content-Range`（HEAD 仅作 ≥4KB 兜底）；403/408/429/5xx 判定为限流→指数退避重试；每段 8 次、全部段耗尽的整体重试 20 轮；`Content-Range` 总长与探测不一致、分段总长不等于文件长度、改名前后长度不符都会显式中止，杜绝「报 done 却只有 1 字节」
-- uTP 传输层骨架（`UtpProto` / `UtpStream`）：BEP-29 20 字节头、SYN→STATE 建链、按 MTU 切片停等 ACK + 指数退避重传、FIN/RESET；诚实标注：无 LEDBAT 拥塞控制 / SACK / RTT 平滑，未接 BitTorrent peer 状态机（uTP 属 BT，不属于 eD2k）
-- RSS hardening (0.11.1-dev): duplicate sources sharing one URL no longer overwrite each other (`touch` / `replace` / `removeOne` keyed by url+title), item cache merges with the old one by link instead of truncating, unread counts use one read-set snapshot per screen (was re-reading `state.json` per row), `@js:` bodies render from offline cache first, response charset taken from `Content-Type` (non-UTF-8 feeds no longer garbled), corrupt `sources.json` is renamed to `sources.broken-*.json` instead of being silently overwritten, and the shared `btn_selector` no longer clips text in 32dp buttons
+- Identity certificates are attached to requests; import formats include `.bks`, `.p12`, `.pem`, `.crt` and `.key`
+- Protocol coverage includes Gemini, Gopher, Finger, Spartan, Nex, Text, Scroll, Titan, Misfin, Kepler, Scorpion, Molerat and Nps; see Section 3
+- TLS variants are supported (`gophers://`, `scorpions://`, `keplers://`)
 
-- Per-source rule editor (0.11.0-dev): long-press a source -> "Edit rule"; every Legado field is editable, `ruleContent` accepts `@css:` / `@@css:` selectors or `@js:` evaluated inside the reader WebView (string / element / collection), plus a "Test" button that shows the first 5 items and a body preview
-- Scheduled refresh + unread badges (0.11.0-dev): `FeedRefreshJob` on JobScheduler; per-source item cache under `filesDir/rss/items/`, unread counts computed offline; source list shows "订阅 (n) · 未读 N"
-- Feed reading (0.10.0-dev, `src/rss/`): source manager -> **All articles** timeline (concurrent fetch across sources, sorted by date); tapping an entry opens the **in-app reader** (`FeedReaderActivity` + `ContentExtractor`: Legado `ruleContent` first, otherwise main-container pick by text density, dropping script/nav/ad blocks); long-press an entry for "open original / favorite / mark unread / copy link"
-- Reader details: offline body cache (`filesDir/rss/cache/<sha1>.html`, auto-fallback with a cache toast when offline), text size cycle 15/17/19/21, dark-mode aware colors, read entries dimmed, favorites kept in `filesDir/rss/state.json`
-- BitTorrent (0.9.0-dev, `src/bt/`): `.torrent` (BEP-3, single/multi-file) and `magnet:` (BEP-9); HTTP(S) tracker announce + compact peers; TCP PeerWire handshake + chunked requests + **per-piece SHA-1 verification** (checked against the original `pieces`, bad pieces returned to the queue, whole-file re-verify at the end)
-- BT extras: BEP-19 HTTP seeds (`url-list` / `httpseeds`, fetched via Range requests when the tracker reports no peers, verified the same way); `.bt.state` piece-level resume; `magnet:` / `.torrent` registered as `ACTION_VIEW` deep links that open the download page and start automatically
-- Honest limits: no seeding/upload, no DHT/PEX, HTTP(S) trackers only (no UDP tracker), HTTP seeds limited to single-file torrents, rare torrents may find no peers without DHT
-- uTP 自检（后台线程 + ProgressDialog）：头部 pack/parse 往返、`127.0.0.1` 环回 8KB 逐字节比对
-- 悬浮窗浏览：`FloatService`（Service + WebView 浮层，可拖动标题栏，复用字体/资源拦截链）
-- 运行日志、安全浏览拦截、看图模式、MQTT / FTP 协议工具
+### 2.3 Feeds and Reading
+
+- Source management: RSS and Atom feeds, with fields compatible with the Legado reader's `rssSources.json`; subscriptions can be imported from and exported to `backup.zip`
+- Aggregate timeline: concurrent fetching across sources, ordered by publication time; long-press an entry to open the original page, favorite it, mark it unread or copy the link
+- In-app reading: the Legado `ruleContent` rule is applied first; otherwise the main container is selected by text density, with scripts, navigation and advertising blocks removed
+- Rule editor: all source fields are editable; `ruleContent` accepts `@css:`, `@@css:` selectors and `@js:` scripts, with a test action that previews the first five entries and the article body
+- Scheduled refresh: a JobScheduler job refreshes at the configured interval (minimum 15 minutes); unread counts are computed offline and shown as "订阅 (n) · 未读 N"
+- Reading details: offline body cache with automatic fallback; text size cycles through 15, 17, 19 and 21; colors follow the night mode; read entries are dimmed; favorites persist
+
+### 2.4 Downloads
+
+- Multi-source segmented download over HTTP(S) Range, with multiple connections per task (default 8, configurable 1 to 16) and automatic mirror switching
+- Dynamic splitting: when more than 4 MB remains and the connection limit is not reached, the remaining range is halved
+- Resume: `.part` and `.part.state` record per-segment progress
+- Integrity: optional SHA-256 verification before the file is renamed
+- Isolated download process: the download service runs in the `:dl` process with the `dataSync` foreground type; the main process and the download process communicate through an atomically written task file, so UI stalls or reclaim do not affect transfers
+- Fault tolerance: size detection trusts only `206` responses with `Content-Range`; `403`, `408`, `429` and `5xx` are treated as rate limiting and retried with exponential backoff; a segment total that does not match the file length aborts explicitly, preventing "completed but incomplete" results
+
+### 2.5 BitTorrent
+
+- Two entry points: `.torrent` files (BEP-3, single and multi-file) and `magnet:` links (BEP-9 metadata extension)
+- Peer discovery: HTTP(S) tracker announce with compact peer lists; magnet links without trackers are completed with three public trackers
+- Transport: TCP PeerWire handshake, block requests and per-piece SHA-1 verification; failed pieces return to the queue, with a full re-verify at the end
+- Scheduling: the peer pool refills continuously, connections are recycled and re-announced when exhausted, and the peer that supplied the metadata is preferred
+- HTTP seeds: BEP-19 `url-list` and `httpseeds`, fetched by Range requests when the tracker reports no peers, verified the same way
+- Resume: `.bt.state` records piece-level progress
+- Deep links: `magnet:` and `.torrent` are registered as `ACTION_VIEW`, opening the download page and starting automatically
+- Limits: no seeding or upload, no DHT or PEX, HTTP(S) trackers only (no UDP tracker), HTTP seeds limited to single-file torrents; rare torrents may find no peers without DHT
+
+### 2.6 Extensions and Tools
+
+- User scripts: `.user.js` import by pasted content or URL, `@match` and `@include` matching, enable and disable, configurable script market URL
+- Web font injection: `shouldInterceptRequest` serves a same-origin `/__vie__/font.ttf` with a companion script, allowing fonts to load within a CSP whitelist
+- Same-origin script injection: `/__vie__/js/<name>.js` is served by the interceptor, falling back to local execution when `script-src` is restricted
+- Floating window browsing: a service hosts a WebView overlay with a draggable title bar, reusing the font and resource interception chain
+- MQTT: connection, subscription and message list based on Eclipse Paho
+- FTP: directory browsing and single-file download based on Apache Commons Net
+- uTP transport skeleton: BEP-29 header, connection setup, MTU-sized stop-and-wait acknowledgement with retransmission, FIN and RESET, plus a loopback self-test; congestion control and BitTorrent peer state are not implemented
 
 ---
 
+## 3. Protocol Support
 
-## 3. Comparison with Other Android smolnet Browsers
+The table lists implemented smolnet protocols and their completeness. "Available" means basic interaction is supported.
 
-|Comparison Item|VieY|Vie|Lagrange|Zapri|portal.mozz.us|
+| Protocol | Status | Notes |
+|---|---|---|
+| `http://`, `https://` | Available | Includes HTTP over TLS |
+| `file://` | Available | Local file access |
+| `gemini://` | Available | Identity certificates supported; uploads use `titan://` |
+| `gopher://` | Available | Text rendering and file download; Gopher+ and `gophers://` supported |
+| `finger://` | Available | Automatic text-to-link conversion not supported |
+| `spartan://` | Available | Upload not supported |
+| `nex://` | Available | Uploads use `nps://` |
+| `text://` | Available | `data:` links supported |
+| `scroll://` | Available | Language list and metadata requests; streaming rendering pending |
+| `titan://` | Available | Text and file upload with identity certificates; `;edit` pending |
+| `misfin://` | Available | Forms A, B and C; C follows draft 9 |
+| `kepler://` | Available | Identity certificates and `keplers://`; page cache pending |
+| `scorpion://` | Available | R sub-protocol and `scorpions://`; other sub-protocols are written but lack test links, so they remain disabled |
+| `molerat://` | Available | Page cache supported; correctness not fully verified for lack of test links |
+| `nps://` | Available | Upload companion to `nex://` |
+
+Several further protocols are under research or set aside: `guppy://`, `cso://`, `fsp://`, `nimigem://`, `mark://`, `terse://`, `inimeg://`, `iapetus://`, `mercury://`, `gequilla://` and `fist://`. Among them `mark://` depends on QUIC and may significantly increase package size; the specifications for `inimeg://` and `iapetus://` are deprecated; `mercury://`, `gequilla://` and `fist://` exist only as proposals without formal specifications.
+
+For broader protocol coverage such as `rtsp://`, `sftp://`, `webdav://` or `irc://`, the parent project Vie is the appropriate choice.
+
+---
+
+## 4. Comparison with Other smolnet Browsers
+
+| Item | VieY | Vie | Lagrange | Zapri | portal.mozz.us |
 |---|---|---|---|---|---|
-|Size|≈10MB|≈5MB|≈20MB|≈20MB|0MB|
-|Platform|Android|Android|Multi-platform|Android|Multi-platform|
-|Client Certificates|Supports .bks .p12 .pem .crt/.key|Supports .bks .p12|Supports .pem|Not supported|Supports .pem|
-|Multi-language|English/Chinese|Chinese only|Multi-language (but Chinese display is broken)|English only|English only|
-|Strengths|Supports many protocols, can browse normal web pages|Supports Tampermonkey scripts, usable as daily browser|Supports multi-platform use|Simple and convenient|Accesses smolnet via HTTP proxy|
-|Weaknesses|Too barebones|Chinese only|Outdated UI|Cannot set client certificates|Unstable; unusable if server goes down|
-|http(s)://|✔ Supported|✔ Supported|✘ Not supported|✘ Not supported|✔ Supported|
-|gemini://|✔ Supported|✔ Supported|✔ Supported|✔ Supported|✔ Supported|
-|gopher(s)://|✔ Supported|✔ Supported|✔ Supported|✘ Not supported|✔ Supported|
-|finger://|✔ Supported|✔ Supported|✔ Supported|✔ Supported|✔ Supported|
-|nex://|✔ Supported|✔ Supported|✔ Supported|✘ Not supported|✔ Supported|
-|text://|✔ Supported|✔ Supported|✘ Not supported|✔ Supported|✔ Supported|
-|spartan://|✔ Supported|✔ Supported|✔ Supported|✘ Not supported|✔ Supported|
-|kepler(s)://|✔ Supported|✔ Supported|✘ Not supported|✘ Not supported|✘ Not supported|
-|scorpion(s)://|✔ Supported|✔ Supported|✘ Not supported|✘ Not supported|✘ Not supported|
-|titan://|✔ Supported|✔ Supported|✔ Supported|✘ Not supported|✔ Supported|
-|misfin://|✔ Supported|✔ Supported|✔ Supported|✘ Not supported|✘ Not supported|
+| Size | ~3.2 MB | ~5 MB | ~20 MB | ~20 MB | No install |
+| Platform | Android | Android | Multi-platform | Android | Multi-platform |
+| Identity certificates | `.bks`, `.p12`, `.pem`, `.crt/.key` | `.bks`, `.p12` | `.pem` | Not supported | `.pem` |
+| Languages | Simplified Chinese, Traditional Chinese, English | Simplified Chinese | Multiple (Chinese rendering broken) | English | English |
+| Strengths | Broad protocol coverage, general web pages work | User scripts, suitable as a daily browser | Multi-platform | Simple | smolnet access through an HTTP proxy |
+| Weaknesses | Plain interface | Chinese only | Dated interface | No identity certificates | Depends on a server; unavailable when it is down |
+| `http(s)://` | Yes | Yes | No | No | Yes |
+| `gemini://` | Yes | Yes | Yes | Yes | Yes |
+| `gopher(s)://` | Yes | Yes | Yes | No | Yes |
+| `finger://` | Yes | Yes | Yes | Yes | Yes |
+| `nex://` | Yes | Yes | Yes | No | Yes |
+| `text://` | Yes | Yes | No | Yes | Yes |
+| `spartan://` | Yes | Yes | Yes | No | Yes |
+| `kepler(s)://` | Yes | Yes | No | No | No |
+| `scorpion(s)://` | Yes | Yes | No | No | No |
+| `titan://` | Yes | Yes | Yes | No | Yes |
+| `misfin://` | Yes | Yes | Yes | No | No |
 
 ---
 
+## 5. Build and Development
 
-## 4. Todo List
+### 5.1 Build
 
-### Features
+The project builds with Gradle and Android Gradle Plugin 7.4.2, and requires JDK 17 and Android SDK Build-Tools 34.0.0.
 
-- Improve night mode
-- Multi-level bookmarks
-- Unify UI layout
-- Supplement protocol support
-- Translate page content
-- Modify in-app fonts
-- Support data: blob: file downloads
-- Modular parsing of text/gemini, text/scroll, and other file types
-- Support download functionality for various smolnet protocols
-- （VieY）uTP：BEP-29 头/停等传输已做，LEDBAT 拥塞控制、SACK、RTT 平滑与 BitTorrent peer/piece 状态机未做；eMule/eD2k 协议本身没有 uTP
-- （VieY）eD2k：已整体移除（不做完整 eMule 内核），`ed2k://` 仅解析文件名/大小当元数据，字节走 HTTP 多源
-- （VieY）插件 `@match` 支持 `*` 通配，尚不支持 `@grant`/`GM_*` 完整语义（可用 `viek.http` 走 Java 代理）
+```bash
+./gradlew assembleRelease    # release build with R8 and resource shrinking
+./gradlew assembleDebug      # debug build, no minification
+./gradlew lintRelease        # static analysis
+```
 
----
+Artifacts are written to `build/outputs/apk/`. Release builds are signed with `keystore/viey-release.jks`; the credentials can be overridden through the `VIEY_STORE_PASS`, `VIEY_KEY_ALIAS` and `VIEY_KEY_PASS` environment variables.
 
+Continuous integration is configured in `.github/workflows/build.yml`. Pushes to `main`, `feature/**` or `fix/**` build the release and debug packages and verify the signature.
 
-## 5. Protocol Support
+### 5.2 Project Layout
 
-### Protocols Supported by VieY Browser
+The source layout follows the convention of iApp Studio, and the build script maps it through `sourceSets`:
 
-Below are the protocols VieY can support, along with the smolnet protocols I am aware of (ordered by implementation time).
+| Path | Content |
+|---|---|
+| `main/AndroidManifest.xml` | Manifest |
+| `src/` | Java source root |
+| `main/res/` | Resources |
+| `main/assets/` | Static assets and injected scripts |
+| `keystore/` | Release signing material |
 
-"Available" means basic interactive functionality is supported.
+To import the project into another IDE, remap the source, resource and dependency paths to the conventional Android layout.
 
-If you know of any smolnet protocols not listed here, please contact me!
+### 5.3 Branch Policy
 
-- Http://
-  - [x] Available
-  - [x] Https:// (Http over TLS)
-- File://
-  - [x] Available
-- Gemini://
-  - [x] Available
-    - [x] Upload using Titan:// sibling protocol
-    - [ ] Upload using Nimigem:// sibling protocol
-    - [ ] Upload using Inimeg:// sibling protocol
-    - [ ] Upload using Iapetus:// sibling protocol
-  - [x] Supports client certificates
-- Finger://
-  - [x] Available
-  - [ ] Auto-convert text to links
-  - [ ] Fingers:// (Finger over TLS)
-- Gopher://
-  - [x] Available
-    - [x] Text rendering
-    - [x] File download
-  - [x] Gopher+
-  - [x] Gophers:// (Gopher over TLS)
-  - [ ] GopherVR
-  - [ ] /_TCP raw data stream
-- Spartan://
-  - [x] Available
-  - [ ] File upload
-- Nex://
-  - [x] Available
-    - [x] Upload using Nps:// sibling protocol
-- Text://
-  - [x] Available
-  - [x] data: link access
-- Scorpion://
-  - [x] Available
-    - [x] R sub-protocol
-    - [ ] S sub-protocol
-    - [ ] M sub-protocol
-    - [ ] I sub-protocol
-      - Due to lack of test links, although other sub-protocol code has been written, correctness cannot be guaranteed, so currently only the R sub-protocol is supported.
-  - [x] Supports client certificates
-  - [x] Scorpions:// (Scorpion over TLS)
-- Kepler://
-  - [x] Available
-  - [x] Supports client certificates
-  - [x] Keplers:// (Kepler over TLS)
-  - [ ] Page caching
-    - The documentation was exhausting to read, so this wasn't implemented, though an interface has been reserved and should be implemented later.
-- Titan://
-  - [x] Available
-    - [x] Upload text
-    - [x] Upload files
-  - [x] Supports client certificates
-  - [ ] ;edit parameter
-- Misfin://
-  - [x] Available
-    - [x] Misfin(A)
-      - Due to lack of test links, although implemented, correctness cannot be guaranteed.
-    - [x] Misfin(B)
-    - [x] Misfin(C)
-      - Misfin(C) is written according to draft 9.
-  - [x] Supports client certificates
-- Scroll://
-  - [x] Available
-    - When rendering custom ordered lists, some inline markup errors may occur that do not conform to specifications.
-  - [x] Language list
-  - [x] Metadata requests
-  - [x] Supports client certificates
-  - [ ] Streaming document rendering
-- Molerat://
-  - [x] Available
-    - Due to lack of test links, correctness is not guaranteed.
-  - [x] Page caching
-- Nps://
-  - [x] Available
-- Guppy://
-  - [ ] Available
-    - Due to lack of test links, although basic code has been written, support is not currently planned.
-- Cso://
-  - [ ] Available
-    - Code is written, but unsure whether to include it.
-- Fsp://
-  - [ ] Available
-    - Under research.
-- Nimigem://
-  - [ ] Available
-    - Under research.
-- Mark://
-  - [ ] Available
-    - Protocol requires QUIC; adding it could double the app size.
-- Terse://
-  - [ ] Available
-    - Difficult to implement; may never be realized.
-- Inimeg://
-  - [ ] Available
-    - Has specification documents, but deprecated
-- Iapetus://
-  - [ ] Available
-    - Has specification documents, but deprecated
-- Mercury://
-  - [ ] Available
-    - Only a proposal exists, no specification document.
-- Gequilla://
-  - [ ] Available
-    - Only a proposal exists, no specification document.
-- Fist://
-  - [ ] Available
-    - Only a proposal exists, no specification document.
+The repository keeps two categories of branches, and each name states its focus directly:
 
+| Branch | Purpose |
+|---|---|
+| `main` | Mainline, always buildable and releasable |
+| `feature/rss-subscription` | RSS subscription and reading work |
 
-### Protocols Supported by Vie Browser
-
-If you need support for:
-
-rslsync://, text://, scroll://, scorpion://, molerat://, titan://, misfin://, btsync://, webdav://, webdavs://, davs://, dav://, ircs://, irc://, snmp://, ldap://, cso://, ed2k://, view-source:, freenet:, content://, intent:, android-app://, scp://, http://, https://, mqtts://, mqtt+ssl://, mqtt+ws://, mqtt+wss://, file://, about:, javascript:, news://, fs2you://, bc://, spartan://, nex://, gophers://, gopher://, gemini://, finger://, buss://, curl://, geo:, smsto:, mmsto:, mms:, mailto:, tel:, sms:, qqdl://, flashget://, thunder://, coaps://, magnet:, jsonfeed://, atom://, coap://, mqtt://, rss://, feed://, dns://, whois://, qotd://, daytime://, time://, rtmp://, rtsp://, smtp://, ftps://, sftp://, tftp://, ftp://, nntp://, ntp://, viek://, ws://, wss://
-
-protocols, and if you are a Simplified Chinese user, you may choose Vie Browser.
+New feature branches use `feature/<focus>` and fixes use `fix/<focus>`; ambiguous names are avoided. A feature branch is merged into `main` once complete.
 
 ---
 
+## 6. Usage
 
-## 6. User Guide
-
-### User Guide
-
-**1.** You can use this app as a normal browser.
-
-**2.** Long press each button on the bottom bar for corresponding actions.
-
-**3.** Settings support importing client certificates in multiple formats.
-
-
-### Developer Guide
-
-**1.** **Please note:** This project uses iApp Studio for packaging, so the project structure differs from traditional project structures!
-
-**2.** If you need to compile with another compiler, you must first modify the project structure!
-
-**3.** Except for the .java files in the kawaii.viey.browser.xy folder, all other files are classes under the kawaii.viey.browser package — be sure to move them accordingly!
-
-**4.** iApp Studio includes built-in dependencies such as AndroidX, so there is no need to import them again. If compiling in another compiler, you must add AndroidX and other dependencies yourself!
-
-**5.** This project uses the Apache License 2.0 open source license and will later apply for software copyright, which will be protected under the "Copyright Law of the People's Republic of China"!
-  - Permissions: Commercial use, modification, privatization, redistribution
-  - Requirements: Retain original copyright notice; mark changes in modified files
-  - Patent grant: Automatically grants users patent usage rights
-  - Prohibitions: Using the project name for promotion (unless permitted)
-  - That is, you may use it for free and may create your own closed-source software after use.
-  - However, you must retain my copyright information.
-  - If making secondary modifications based on this app, you must place "This project is based on the open-source VieY Browser by Daimao Piao A Piao, original project open-source address: https://gitee.com/awzx3214/VieYBrowser/ " in a visible location such as the Acknowledgments / Open Source License section.
-  - If only using part of the code, simply indicate in the open source license section that this project was used.
+1. Use it as an ordinary browser by entering a URL.
+2. Long-press each button on the bottom action bar for its shortcut.
+3. Identity certificates are imported from the settings page and several formats are accepted.
+4. Feed features are under "订阅源管理" in settings: add sources, edit rules, import and export backups, and enable scheduled background refresh.
+5. Download features are under "下载" in settings, covering multi-source HTTP downloads and BitTorrent.
 
 ---
-
 
 ## 7. Tech Stack
 
-- Android Java + HTML/JavaScript
-- iApp Studio packaging
-- Custom link parsing
-- Modular implementation
+- Android Java, with HTML and JavaScript for the interface layer
+- Gradle build with GitHub Actions continuous integration
+- jsoup for HTML parsing and article extraction
+- BouncyCastle for certificate and key handling
+- Eclipse Paho for MQTT and Apache Commons Net for FTP
+- Custom URL handling and modular protocol implementations
 
 ---
 
+## 8. FAQ
 
-## 8. Simple Q&A
+**Why does the feature set differ from the parent project Vie?**
 
-**1.** Q: Why are there so few features?
- - A: Because this is specifically written for smolnet access. That said, it's not ruled out that I might rewrite all of Vie's features in Java on top of this later, since Vie is too laggy.
+This project targets smolnet access and prioritizes protocol coverage and a clean browsing experience, so modules unrelated to the browsing core were deliberately trimmed. Parts of Vie may later be rewritten in Java and merged in.
 
+**What is smolnet?**
 
-**2.** Q: What is smolnet?
- - A: I'm not sure how to put it — maybe ask an AI, it explains in detail. Simply put, it's an ad-free, plain-text web.
+smolnet refers to a family of text-oriented, advertisement-free and lightweight network protocols and communities, including Gemini, Gopher, Finger and Nex. Pages are structurally simple, which suits low-bandwidth and low-power devices.
 
+**Why is the source sparsely commented?**
 
-**3.** Q: Why is there no code comments?
- - A: Because I do this as a hobby, and I'm still a student with limited time (honestly, I'm just lazy). Some code was directly copied from my previous project "Vie Browser", like HTML files and some Java files. There's so much of it — maybe just consider VieY Browser as closed-source software.
+This is a personal interest project developed in limited time, and some code and page assets come directly from the parent project Vie. Comments are being added progressively, and the key modules for downloads, BitTorrent and feeds already carry reasonably complete documentation.
 
+**Why does the project layout differ from a conventional Android project?**
 
-**4.** Q: Why is the project structure so weird?
- - A: Because I didn't use Android Studio or similar compilers, so the project structure looks unusual. If you want to put it into Android Studio or the like, well, you might have to restructure the project and dependencies yourself.
+The project was originally developed in iApp Studio and kept its directory convention. A Gradle build script has since been added, so it builds directly; developing in Android Studio requires remapping the source and resource paths and declaring dependencies locally.
 
+**Why is the name VieY?**
 
-**5.** Q: Why is it called VieY?
- - A: The previous browser was called Vie (also VieK). I was too lazy to come up with a new name, so I just appended the name Y from an old friend to Vie.
+The parent project is named Vie, also known as VieK. The prefix is retained, and the suffix Y comes from the name of a friend of the author.
 
+**Why is the app not published on app stores?**
 
-**6.** Q: Why not list it on app stores?
- - A: Because it's such a hassle. I write this purely as a hobby — it doesn't matter if anyone uses it or not. The process of writing it already makes me happy.
+It is an interest-driven open-source project that does not target broad distribution, so packages are published through the author's own channels.
 
+**Why are all certificates trusted instead of using TOFU?**
 
-**7.** Q: Why not implement TOFU and instead trust all certificates outright?
- - A: Might add it later. I didn't know about this before and simply ignored it.
+Certificate pinning was not implemented in early versions, so self-signed certificates are currently trusted unconditionally. TOFU and certificate fingerprint verification are planned.
 
-**8.** Q: Why use iApp Studio instead of a regular compiler?
- - A: Because it supports Chinese, and it can package my Java programs directly on a mobile phone. I can write a couple lines of code while lying in bed when I'm free, which is pretty convenient.
+**Why was iApp Studio chosen originally instead of a conventional compiler?**
 
-**9.** Q: How can I contact the author / report issues?
- - A: Contact info is below.
+iApp Studio offers a Chinese interface and can build and package Java projects directly on a mobile device, which suited development in short sessions. The project now builds with Gradle, so this constraint no longer applies.
+
+**How can I report a problem or suggest a feature?**
+
+See the contact details in Section 10.
 
 ---
 
+## 9. License
 
-## 9. Contact Information
+This project is licensed under the Apache License 2.0.
 
-If you:
-- Don't know how to use it
-- Want to report issues
-- Hope to add new features
-- Want to get the latest source code (sometimes I may forget to upload source code; feel free to remind me)
+- Commercial use, modification, private deployment and redistribution are permitted
+- The original copyright notice must be retained, and modified files must be marked as changed
+- A patent license is granted automatically to users
+- The project name may not be used for promotion without permission
 
-Please reach out via the following channels:
-- QQ → 2171802813
-- email → [VieBrowser@hotmail.com](mailto:VieBrowser@hotmail.com) （Vie without Y）
-- Coolapk → [@呆毛飘啊飘](https://www.coolapk.com/u/1318094)
-- TG → @Kawaii_R
+When building on this project, include the following notice in the acknowledgements, license section or another visible location:
 
-[VieY Browser Official Website](https://palhube666.wodemo.net/) / [Download Link ①](https://dmpap.lanzouw.com/b02dc84ch) / [Download Link ②](https://www.123pan.com/s/UML9jv-fk4bh.html) / [Download Link ③](https://t.me/Kawaii_V)
+> This project is based on the open-source VieY Browser by Daimao Piao A Piao, originally published at <https://gitee.com/awzx3214/VieYBrowser/>
+
+If only parts of the code are used, citing the project in the license section is sufficient.
+
+---
+
+## 10. Contact
+
+For usage questions, problem reports, feature requests or access to the latest source, contact the author through any of the following:
+
+- QQ: 2171802813
+- Email: <VieBrowser@hotmail.com> (note that the domain contains no letter Y)
+- Coolapk: [@呆毛飘啊飘](https://www.coolapk.com/u/1318094)
+- Telegram: @Kawaii_R

@@ -1,371 +1,262 @@
-# VieYBrowser - 一个安卓小网浏览器
+# VieY 浏览器
 
-![VieY 浏览器图标](/icon.png)
+面向 smolnet（小网）的轻量安卓浏览器
 
-[VieY 浏览器官网](https://palhube666.wodemo.net/) / [下载途径①](https://dmpap.lanzouw.com/b02dc84ch) / [下载途径②](https://www.123pan.com/s/UML9jv-fk4bh.html) / [下载途径③](https://t.me/Kawaii_V)
+[English](README.md) | 简体中文
 
-简体中文 | [English](/README.md)
-
-## 1. 项目概述
-
-欢迎下载 / 使用 Vie 浏览器
-
-VieY 浏览器是由 呆毛飘啊飘 开发的**安卓端开源轻量浏览器**
-
-VieY 是本人 Vie 项目的一个分支，去除了多余功能，保留并且强化了关于小网方面的部分
-
-安装包体积约 10 MB
-
+- 项目主页：<https://palhube666.wodemo.net/>
+- 下载地址：[蓝奏云](https://dmpap.lanzouw.com/b02dc84ch) · [123 云盘](https://www.123pan.com/s/UML9jv-fk4bh.html) · [Telegram](https://t.me/Kawaii_V)
+- 当前版本：0.11.4-dev，安装包约 3.2 MB
 
 ---
 
-## 2.1 新增功能（dev/feed-subscription 分支）
+## 一、项目概述
 
-**订阅 / RSS**
-- 订阅源管理：新增、删除、复制链接，支持 RSS 2.0 / RSS 1.0(RDF) / Atom
-- 兼容「阅读(Legado)」订阅源规则：`ruleArticles / ruleTitle / ruleLink / rulePubDate / ruleDescription / ruleImage`，栏目规则式 HTML 列表也能解析
-- 备份恢复：直接读取「阅读」的 `backup.zip` 内 `rssSources.json`，按订阅地址去重合并导入；导出为同结构的 `VieY-rss-backup.zip`，可直接在「阅读」里恢复
-- 订阅源规则编辑器（0.11.0-dev）：长按订阅源 →「编辑规则」，可逐字段改 `ruleArticles / ruleTitle / ruleLink / rulePubDate / ruleDescription / ruleImage / ruleContent / ruleNextPage`，`ruleContent` 支持 `@css:` / `@@css:` 选择器与 `@js:` 页面脚本（`@js:` 在阅读页的 WebView 里执行，返回字符串/元素/元素集合，结果走同一套排版）；「测试」按钮抓一次即可看到前 5 条标题与正文预览
-- 定时后台刷新 + 未读角标（0.11.0-dev）：`FeedRefreshJob`（JobScheduler，`setPersisted` 开机续跑）；条目缓存落 `filesDir/rss/items/<sha1>.json`，未读数直接由缓存与已读集合算出，不必联网；订阅列表显示「订阅 (n) · 未读 N」，条目列表显示「未读 N · 时间」
-- 订阅健壮性（0.11.1-dev）：同 URL 的多个订阅源不再互相顶掉（`touch` / `replace` / `removeOne` 按「地址+名称」定位）；条目缓存按 link 与旧缓存合并，不再截断老条目；未读计数每屏只取一次已读快照（原来每行都读一遍 `state.json`）；`@js:` 正文先出离线缓存再后台更新；按 `Content-Type` 探测编码，非 UTF-8 源不再乱码；`sources.json` 损坏时另存为 `sources.broken-*.json` 而非被静默覆盖；共用 `btn_selector` 不再把 32dp 按钮里的文字裁掉上半截
-- 入口：设置 → 订阅
+VieY 浏览器是一款面向 smolnet 协议的开源安卓浏览器，由呆毛飘啊飘发起。该项目由作者的早期作品 Vie 派生而来，在保留小网相关能力的基础上精简了与浏览核心无关的模块，并补充了订阅阅读、多源下载、BitTorrent 等自研功能。
 
-**网页自定义字体（CSP 安全）**
-- 带 CSP 的站点（如 `zhihu.com/appview/special`）会拦截内联 `@font-face` 和 `data:` 字体
-- 实现方式：在 `shouldInterceptRequest` 里用「页面同源 URL」返回字体与注入脚本
-  - `https://<当前页面 host>/__vie__/font.ttf` → 字体字节
-  - `https://<当前页面 host>/__vie__/font.js` → 注入脚本
-- 同源资源本身在 CSP 允许名单内，不需要放行 `data:` / `unsafe-eval`
-- 注入脚本用二进制 `FontFace` + `CSSStyleSheet.adoptedStyleSheets` 应用，优先网络加载 `<script src>`，被 `script-src` 拦截时退回 WebView 直接执行
-- 入口：设置 → 网页字体（开关 + 选择 `.ttf/.otf`）
+项目以 Java 编写，最低支持 Android 5.0（API 21），目标版本为 Android 14（API 34）。全部功能均在单一安装包内实现，不依赖外部运行时。
 
 ---
 
-## 2.2 构建
+## 二、功能特性
 
-需要 JDK 17 + Android SDK（compileSdk 34 / build-tools 34.0.0）。
+### 2.1 浏览核心
+
+- 支持普通网页浏览，兼容 HTTP 与 HTTPS
+- 下拉刷新页面
+- 底部操作栏支持长按调用快捷功能
+- 视频全屏播放
+- 网页可调用定位、麦克风与摄像头
+- 支持外部应用通过本地存储访问应用内部文件
+- 内置运行日志，按页面、资源、脚本、MQTT、FTP 分类记录
+- 安全浏览拦截，命中规则时展示警告页，可选择返回或继续访问
+- 看图模式，点击图片放大显示，再次点击退出
+
+### 2.2 smolnet 身份与协议
+
+- 支持 smolnet 身份证书随请求发送，可导入 `.bks`、`.p12`、`.pem`、`.crt` 与 `.key` 等格式
+- 支持 Gemini、Gopher、Finger、Spartan、Nex、Text、Scroll、Titan、Misfin、Kepler、Scorpion、Molerat、Nps 等协议，详见第三节
+- 支持 TLS 变体（`gophers://`、`scorpions://`、`keplers://`）
+
+### 2.3 订阅与阅读
+
+- 订阅源管理：支持 RSS 与 Atom 源，字段兼容阅读应用 Legado 的 `rssSources.json`，可导入与导出 `backup.zip` 订阅备份
+- 聚合时间线：多源并发抓取，按发布时间倒序展示，长按条目可执行「打开原网页」「收藏」「标记未读」「复制链接」
+- 应用内阅读：优先按 Legado `ruleContent` 取值，未命中时按文本密度选取主容器，并剔除脚本、导航与广告区块
+- 规则编辑器：订阅源字段均可编辑，`ruleContent` 支持 `@css:`、`@@css:` 选择器与 `@js:` 脚本三种形式，并提供测试按钮预览前 5 条结果与正文
+- 定时刷新：基于 JobScheduler 的后台任务，按设定间隔（最小 15 分钟）刷新，未读数离线计算，列表标题显示「订阅 (n) · 未读 N」
+- 阅读细节：正文离线缓存，断网时自动回落并提示；字号支持 15、17、19、21 四档循环；配色跟随夜间模式；已读条目置灰；收藏记录持久保存
+
+### 2.4 下载
+
+- 多源分段下载：HTTP(S) Range 分段，单任务支持多连接（默认 8，可配置 1 至 16），支持多镜像自动换源
+- 动态分片：剩余数据大于 4 MB 且未达连接上限时自动对半拆分
+- 断点续传：以 `.part` 与 `.part.state` 记录逐段进度，中断后可恢复
+- 完整性校验：可选 SHA-256 校验，通过后改名
+- 独立下载进程：下载服务声明为 `:dl` 进程并携带 `dataSync` 前台服务类型，主进程与下载进程通过任务文件原子写入通信，界面卡顿或回收不影响下载
+- 容错策略：尺寸探测仅采信 `206` 与 `Content-Range` 响应；`403`、`408`、`429` 与 `5xx` 判定为限流并指数退避重试；分段总长与文件长度不一致时显式中止，避免出现「完成但内容不完整」的情况
+
+### 2.5 BitTorrent
+
+- 双入口：`.torrent` 文件（BEP-3，支持单文件与多文件）与 `magnet:` 链接（BEP-9 元数据扩展）
+- 节点发现：HTTP(S) tracker announce，解析 compact 节点列表；未携带 tracker 的磁力链接自动补齐三个公共 tracker
+- 传输：TCP PeerWire 握手、分块请求、逐片 SHA-1 校验；校验失败的片回退队列重下，完成后整体复核
+- 调度：节点池滚动补充，连接结束后回收并重新 announce，元数据来源节点优先参与下载
+- HTTP 种子：支持 BEP-19 `url-list` 与 `httpseeds`，tracker 无可用节点时按 Range 取片，同样逐片校验
+- 续传：`.bt.state` 记录片级进度
+- 深链：`magnet:` 与 `.torrent` 已注册 `ACTION_VIEW`，点击链接直接进入下载页并自动开始
+- 能力边界：不做种子上传，不做 DHT 与 PEX，仅支持 HTTP(S) tracker（不含 UDP tracker），HTTP 种子目前仅支持单文件种子；无 DHT 时冷门种子可能找不到可用节点
+
+### 2.6 扩展与工具
+
+- 用户脚本：支持 `.user.js` 导入（粘贴内容或填写地址），按 `@match` 与 `@include` 匹配，可启停，脚本市场地址可配置
+- 网页字体注入：通过 `shouldInterceptRequest` 返回同源 `/__vie__/font.ttf` 与配套脚本，可在 CSP 白名单内加载，规避内容安全策略拦截
+- 同源脚本注入：`/__vie__/js/<name>.js` 由拦截器返回，`script-src` 受限时回退至本地执行
+- 悬浮窗浏览：以服务承载 WebView 浮层，标题栏可拖动，复用字体与资源拦截链
+- MQTT：基于 Eclipse Paho，支持连接、订阅与消息列表
+- FTP：基于 Apache Commons Net，支持目录浏览与单文件下载
+- uTP 传输骨架：实现 BEP-29 头部、建链、按 MTU 切片停等确认与重传、FIN 与 RESET，并提供环回自检；暂未实现拥塞控制与 BitTorrent 节点状态机
+
+---
+
+## 三、协议支持
+
+下表列出 VieY 已实现的 smolnet 协议及其完成度。「可用」指具备基本交互能力。
+
+| 协议 | 状态 | 说明 |
+|---|---|---|
+| `http://`、`https://` | 可用 | 含 HTTP over TLS |
+| `file://` | 可用 | 本地文件访问 |
+| `gemini://` | 可用 | 支持身份证书；上传使用 `titan://` |
+| `gopher://` | 可用 | 文本渲染与文件下载；支持 Gopher+ 与 `gophers://` |
+| `finger://` | 可用 | 暂不支持文本自动转链接 |
+| `spartan://` | 可用 | 暂不支持上传 |
+| `nex://` | 可用 | 上传使用 `nps://` |
+| `text://` | 可用 | 支持 `data:` 链接 |
+| `scroll://` | 可用 | 支持语言列表与元数据请求；流式渲染待实现 |
+| `titan://` | 可用 | 支持文本与文件上传，携带身份证书；`;edit` 参数待实现 |
+| `misfin://` | 可用 | 支持 A、B、C 三种形式，C 依据 draft 9 实现 |
+| `kepler://` | 可用 | 支持身份证书与 `keplers://`；页面缓存待实现 |
+| `scorpion://` | 可用 | 支持 R 子协议与 `scorpions://`；其余子协议已编写但缺少测试链接，暂不启用 |
+| `molerat://` | 可用 | 支持页面缓存；缺少测试链接，正确性未完全验证 |
+| `nps://` | 可用 | 作为 `nex://` 的上传附属协议 |
+
+另有若干协议处于研究或搁置状态：`guppy://`、`cso://`、`fsp://`、`nimigem://`、`mark://`、`terse://`、`inimeg://`、`iapetus://`、`mercury://`、`gequilla://`、`fist://`。其中 `mark://` 依赖 QUIC，引入后体积可能显著增加；`inimeg://` 与 `iapetus://` 的规范已废弃；`mercury://`、`gequilla://`、`fist://` 目前仅有提议，尚无正式规范。
+
+如需更多协议支持（如 `rtsp://`、`sftp://`、`webdav://`、`irc://` 等），可选用母项目 Vie 浏览器。
+
+---
+
+## 四、与其他 smolnet 浏览器的对比
+
+| 对比项 | VieY | Vie | Lagrange | Zapri | portal.mozz.us |
+|---|---|---|---|---|---|
+| 体积 | 约 3.2 MB | 约 5 MB | 约 20 MB | 约 20 MB | 无需安装 |
+| 平台 | 安卓 | 安卓 | 多平台 | 安卓 | 多平台 |
+| 身份证书 | 支持 `.bks`、`.p12`、`.pem`、`.crt/.key` | 支持 `.bks`、`.p12` | 支持 `.pem` | 不支持 | 支持 `.pem` |
+| 多语言 | 简体中文、繁体中文、英语 | 简体中文 | 多语言（中文显示异常） | 英语 | 英语 |
+| 优点 | 协议覆盖较全，可正常访问普通网页 | 支持用户脚本，可作日常浏览器 | 多平台 | 简洁 | 经 HTTP 代理访问 smolnet |
+| 缺点 | 界面朴素 | 仅支持中文 | 界面陈旧 | 不支持身份证书 | 依赖服务端，服务不可用时无法访问 |
+| `http(s)://` | 支持 | 支持 | 不支持 | 不支持 | 支持 |
+| `gemini://` | 支持 | 支持 | 支持 | 支持 | 支持 |
+| `gopher(s)://` | 支持 | 支持 | 支持 | 不支持 | 支持 |
+| `finger://` | 支持 | 支持 | 支持 | 支持 | 支持 |
+| `nex://` | 支持 | 支持 | 支持 | 不支持 | 支持 |
+| `text://` | 支持 | 支持 | 不支持 | 支持 | 支持 |
+| `spartan://` | 支持 | 支持 | 支持 | 不支持 | 支持 |
+| `kepler(s)://` | 支持 | 支持 | 不支持 | 不支持 | 不支持 |
+| `scorpion(s)://` | 支持 | 支持 | 不支持 | 不支持 | 不支持 |
+| `titan://` | 支持 | 支持 | 支持 | 不支持 | 支持 |
+| `misfin://` | 支持 | 支持 | 支持 | 不支持 | 不支持 |
+
+---
+
+## 五、构建与开发
+
+### 5.1 构建
+
+项目使用 Gradle 与 Android Gradle Plugin 7.4.2 构建，编译环境要求 JDK 17 与 Android SDK Build-Tools 34.0.0。
 
 ```bash
-export JAVA_HOME=/path/to/jdk-17
-export ANDROID_HOME=/path/to/android-sdk
-./gradlew assembleDebug
+./gradlew assembleRelease    # 发布包，启用 R8 混淆与资源收缩
+./gradlew assembleDebug      # 调试包，不混淆
+./gradlew lintRelease        # 静态检查
 ```
 
-产物：`build/outputs/apk/debug/VieY-debug.apk`
+产物位于 `build/outputs/apk/`。发布包使用仓库内 `keystore/viey-release.jks` 签名，签名口令可通过环境变量 `VIEY_STORE_PASS`、`VIEY_KEY_ALIAS`、`VIEY_KEY_PASS` 覆盖。
 
+持续集成配置位于 `.github/workflows/build.yml`，推送至 `main` 或 `dev/**` 分支时自动构建发布包与调试包，并校验签名。
 
----
+### 5.2 项目结构
 
-## 2.3 从 Vie 6.5.0 移植的能力（dev/feed-subscription → main）
+源码目录沿用 iApp Studio 的布局约定，构建脚本通过 `sourceSets` 映射：
 
-对照 `Vie_6.5.0.apk`（母项目 Vie，`kawaii.vie`，versionCode 106500）与 5.1.9 / 仓库 6.0.0 的差异逐项落地：
+| 路径 | 内容 |
+|---|---|
+| `main/AndroidManifest.xml` | 清单文件 |
+| `src/` | Java 源码根目录 |
+| `main/res/` | 资源文件 |
+| `main/assets/` | 静态资源与注入脚本 |
+| `keystore/` | 发布签名 |
 
-| Vie 6.5.0 能力 | VieY 实现 | 位置 |
-|---|---|---|
-| `gm` 脚本：XHR 全量代理（json/document/blob/arraybuffer/stream、进度、超时） | Java 侧 `viey.http(...)` 异步请求 + `viek.http / viek.fetch` JS API，二进制走 base64 | `src/util/WebJs.java`、`assets/js/viey-bridge.js` |
-| `end` 脚本：`console.*` → 运行日志 | `viey.console(level,msg)` 落盘 + 页面报错/rejection 捕获 | 同上、`src/util/LogStore.java` |
-| `log.html` 日志面板 | 运行日志页（页面/资源/脚本/MQTT/FTP 分类行） | `src/activity/LogActivity.java` |
-| `journal` 资源日志 | `shouldInterceptRequest` 记录主框架请求 | `src/view/WebViey.java` |
-| 安全浏览拦截页（钓鱼/恶意/继续访问） | 内置 `blocklist.txt` 规则 + 警告页（返回 / 继续访问） | `src/util/SafeBrowse.java`、`assets/blocklist.txt` |
-| `seimage` 看图模式 | 点图放大覆盖层（图片/背景图，点击退出） | `assets/js/vie-image.js` |
-| `mqttv3`（Paho MQTT） | MQTT 订阅面板：连接、订阅、消息列表、断线提示 | `src/net/MqttActivity.java` |
-| `net`（Apache Commons Net） | FTP 目录浏览 + 单文件下载（SMTP/TFTP/NNTP 同库已引入） | `src/net/FtpActivity.java` |
-| 同源注入脚本（CSP 站点可用） | `/__vie__/js/<name>.js` 由 `shouldInterceptRequest` 返回，`script-src` 被拦时回退本地执行 | `src/util/VieAsset.java` |
-| 全局字体 | 网页字体注入（同源 `font.ttf` + 二进制 FontFace） | `src/util/FontInject.java` |
+在其他集成开发环境中导入时，需按常规安卓工程结构重新映射源码、资源与依赖路径。
 
-**未移植（说明）**：
-- 订阅阅读（0.10.0-dev，`src/rss/`）：订阅源管理 →「全部文章」聚合时间线（多源并发抓取、按时间倒序）；点条目进**应用内阅读页**（`FeedReaderActivity` + `ContentExtractor`：先按 Legado `ruleContent` 取值，否则按文本密度挑主容器，去 script/nav/广告块）；长按条目可「原网页 / 收藏 / 标记未读 / 复制链接」
-- 阅读页细节：正文离线缓存（`filesDir/rss/cache/<sha1>.html`，断网自动回落并提示「离线缓存」）、字号 15/17/19/21 循环、跟随夜间模式配色、已读置灰、收藏「★」落 `filesDir/rss/state.json`
-- BT 下载（0.9.0-dev，`src/bt/`）：`.torrent`（BEP-3 单/多文件）与 `magnet:`（BEP-9）双入口；HTTP(S) tracker announce + compact peers；TCP PeerWire 握手 + 分块请求 + **逐片 SHA-1 校验**（与 `pieces` 原文比对，坏片丢回队列重下，完成后整盘复核）
-- BT 补充：BEP-19 HTTP 种子（`url-list` / `httpseeds`，tracker 无 peer 时按 Range 取片，同样逐片校验）；`.bt.state` 逐片续传；`magnet:` / `.torrent` 已注册 `ACTION_VIEW` 深链，点链接直接进下载页并自动开始
-- BT 诚实边界：不做做种/上传、不做 DHT/PEX、仅 HTTP(S) tracker（无 UDP tracker）、HTTP 种子暂只支持单文件种子；无 DHT 时冷门种子可能取不到 peer
-- `ed2k` / jmule 引擎：**已按用户要求废弃**（不做完整 eMule 内核）。改为「uTP / HTTP 多源多进程下载」：`src/dl/{HttpSegDown,DlService,DlStore,DlActivity}.java` 做多镜像 Range 分段 + `:dl` 独立进程 + 断点续传，`src/net/{UtpProto,UtpStream,UtpSelfTest}.java` 做 BEP-29 头与停等传输骨架；`ed2k://` 仅作为元数据解析文件名/大小。
-- 桌面小部件（awzxWidget）、快捷磁贴（awzxTile）、壁纸服务：偏系统集成，与浏览器核心无关。
-- 存储配额面板、鼠标键盘事件注入：6.5.0 的宿主引擎机制（iApp/Lua 运行时）绑定较深，需按其脚本协议重做，暂列后续。
-- 插件机制已按「用户脚本 + 脚本市场 URL」重做（`PluginStore` / `PluginActivity`），悬浮窗浏览已用 `FloatService`（Service + WebView 浮层）实现。
+### 5.3 分支约定
 
+仓库仅保留两类分支，分支名需直接体现其重点：
 
-## 2. 功能展示
+| 分支 | 用途 |
+|---|---|
+| `main` | 主线，始终保持可构建、可发布 |
+| `feature/rss-subscription` | RSS 订阅与阅读相关的特性分支 |
 
-- 支持 smolnet 身份证书的请求
-- 支持正常普通网页的访问
-- 下拉刷新页面
-- 底部操作栏长按快捷功能
-- 视频全屏播放
-- 网页使用定位、麦克风、摄像头
-- 支持外部应用通过本地存储访问内部文件
-- 最低支持安卓 5 设备
+新增特性分支按 `feature/<重点>` 命名，修复分支按 `fix/<重点>` 命名，避免使用含义模糊的名称。特性完成后并入 `main`。
 
 ---
 
+## 六、使用说明
 
-## 3. 与其他安卓 smolnet 浏览器对比
-
-|对比项|VieY|Vie|Lagrange|Zapri|portal.mozz.us|
-|---|---|---|---|---|---|
-|体积|≈10MB|≈5MB|≈20MB|≈20MB|0MB|
-|平台|安卓|安卓|多平台|安卓|多平台|
-|身份证书|支持 .bks .p12 .pem .crt/.key|支持 .bks .p12|支持 .pem|不支持|支持 .pem|
-|多语言|英语/中文|仅中文|多语言（但是中文无法正常显示）|仅英语|仅英语|
-|优点|支持协议多，可正常访问网页|支持油猴脚本可作为日常浏览器使用|支持多平台使用|简约方便|依靠 http 代理访问 smolnet|
-|缺点|过于简陋|仅支持中文|界面过时|无法设置身份证书|不稳定，若服务器宕机则无法使用|
-|http(s)://|✔支持|✔支持|✘不支持|✘不支持|✔支持|
-|gemini://|✔支持|✔支持|✔支持|✔支持|✔支持|
-|gopher(s)://|✔支持|✔支持|✔支持|✘不支持|✔支持|
-|finger://|✔支持|✔支持|✔支持|✔支持|✔支持|
-|nex://|✔支持|✔支持|✔支持|✘不支持|✔支持|
-|text://|✔支持|✔支持|✘不支持|✔支持|✔支持|
-|spartan://|✔支持|✔支持|✔支持|✘不支持|✔支持|
-|kepler(s)://|✔支持|✔支持|✘不支持|✘不支持|✘不支持|
-|scorpion(s)://|✔支持|✔支持|✘不支持|✘不支持|✘不支持|
-|titan://|✔支持|✔支持|✔支持|✘不支持|✔支持|
-|misfin://|✔支持|✔支持|✔支持|✘不支持|✘不支持|
+1. 可作为普通浏览器直接使用，输入网址即可访问。
+2. 长按底部操作栏的每个按键，可调用对应的快捷功能。
+3. 设置页提供身份证书导入，支持多种格式。
+4. 订阅相关功能位于设置页「订阅源管理」，可新增源、编辑规则、导入导出备份，并开启定时后台刷新。
+5. 下载相关功能位于设置页「下载」，支持 HTTP 多源分段下载与 BitTorrent 下载。
 
 ---
 
+## 七、技术栈
 
-## 4. 待办事项
-
-### 功能
-
-- 完善夜间模式
-- 多级书签
-- 统一 ui 布局
-- 补全协议支持
-- 翻译页面内容
-- 修改软件内字体
-- 支持 data: blob: 文件下载
-- 模块化解析 text/gemini text/scroll 等类型文件
-- 支持 smolnet 各协议下载功能
+- Android Java，界面层使用 HTML 与 JavaScript
+- Gradle 构建，GitHub Actions 持续集成
+- jsoup 用于 HTML 解析与正文抽取
+- BouncyCastle 用于证书与密钥处理
+- Eclipse Paho 用于 MQTT，Apache Commons Net 用于 FTP
+- 自定义链接解析与模块化协议实现
 
 ---
 
+## 八、常见问答
 
-## 5. 协议支持性
+**问：为什么功能数量少于母项目 Vie？**
 
-### VieY 浏览器支持的协议
+答：本项目面向 smolnet 访问场景，优先保证协议覆盖与浏览体验，刻意精简了与浏览核心无关的模块。后续可视需要将 Vie 的部分能力以 Java 重写并入。
 
-以下是 VieY 能够支持的与我已知的 smolnet 协议（按实现的时间排序）
+**问：什么是 smolnet？**
 
-“可用”表示支持进行基本交互功能
+答：smolnet 指一组以纯文本为主、无广告、轻量化的网络协议与社区，包括 Gemini、Gopher、Finger、Nex 等。其页面结构简单，适合在低带宽与低性能设备上访问。
 
-如果你还知道什么没有列出的 smolnet 协议，请联系我哦~
+**问：为什么代码注释较少？**
 
-- Http://
-  - [x] 可用
-  - [x] Https:// (Http over TLS)
-- File://
-  - [x] 可用
-- Gemini://
-  - [x] 可用
-    - [x] 上传使用 Titan:// 附属协议
-    - [ ] 上传使用 Nimigem:// 附属协议
-    - [ ] 上传使用 Inimeg:// 附属协议
-    - [ ] 上传使用 Iapetus:// 附属协议
-  - [x] 携带身份证书
-- Finger://
-  - [x] 可用
-  - [ ] 自动将文本转链接
-  - [ ] Fingers:// (Finger over TLS)
-- Gopher://
-  - [x] 可用
-    - [x] 文本渲染
-    - [x] 文件下载
-  - [x] Gopher+
-  - [x] Gophers:// (Gopher over TLS)
-  - [ ] GopherVR
-  - [ ] /_TCP 原始数据流
-- Spartan://
-  - [x] 可用
-  - [ ] 文件上传
-- Nex://
-  - [x] 可用
-    - [x] 上传使用 Nps:// 附属协议
-- Text://
-  - [x] 可用
-  - [x] data: 链接访问
-- Scorpion://
-  - [x] 可用
-    - [x] R 子协议
-    - [ ] S 子协议
-    - [ ] M 子协议
-    - [ ] I 子协议
-      - 由于无测试链接，虽已编写完毕其他子协议代码，但是无法保证正确性，故目前只支持 R 子协议
-  - [x] 携带身份证书
-  - [x] Scorpions:// (Scorpion over TLS)
-- Kepler://
-  - [x] 可用
-  - [x] 携带身份证书
-  - [x] Keplers:// (Kepler over TLS)
-  - [ ] 页面缓存
-    - 文档看的我好累，这个没写，不过已经预留了个接口，后面应该会实现
-- Titan://
-  - [x] 可用
-    - [x] 上传文本
-    - [x] 上传文件
-  - [x] 携带身份证书
-  - [ ] ;edit 参数
-- Misfin://
-  - [x] 可用
-    - [x] Misfin(A)
-      - 由于无测试链接，虽已编写完毕，但是无法保证正确性
-    - [x] Misfin(B)
-    - [x] Misfin(C)
-      - Misfin(C) 依据 draft 9 编写
-  - [x] 携带身份证书
-- Scroll://
-  - [x] 可用
-    - 渲染时遇到自定义序号列表，内联标记会出现部分不符合规定的错误
-  - [x] 语言列表
-  - [x] 元数据请求
-  - [x] 携带身份证书
-  - [ ] 流式渲染文档
-- Molerat://
-  - [x] 可用
-    - 由于无测试链接，不保证正确性
-  - [x] 页面缓存
-- Nps://
-  - [x] 可用
-- Guppy://
-  - [ ] 可用
-    - 由于无测试链接，虽已编写完基础代码，但是暂时不打算支持
-- Cso://
-  - [ ] 可用
-    - 代码写完了，但是不知道要不要加进来
-- Fsp://
-  - [ ] 可用
-    - 正在研究中
-- Nimigem://
-  - [ ] 可用
-    - 正在研究中
-- Mark://
-  - [ ] 可用
-    - 协议必须使用 QUIC，如果加上软件体积可能翻倍
-- Terse://
-  - [ ] 可用
-    - 较难实，可能永远不会实现
-- Inimeg://
-  - [ ] 可用
-    - 有规范文件，但已废弃
-- Iapetus://
-  - [ ] 可用
-    - 有规范文件，但已废弃
-- Mercury://
-  - [ ] 可用
-    - 仅有提议，无规范文件
-- Gequilla://
-  - [ ] 可用
-    - 仅有提议，无规范文件
-- Fist://
-  - [ ] 可用
-    - 仅有提议，无规范文件
+答：本项目为个人兴趣项目，开发时间有限；部分代码与页面资源直接沿用母项目 Vie。注释正在逐步补充，关键模块（下载、BitTorrent、订阅）已具备较完整的说明。
 
+**问：为什么项目结构不同于常规安卓工程？**
 
-### Vie 浏览器支持的协议
+答：项目最初在 iApp Studio 中开发，保留了其目录约定。目前已补充 Gradle 构建脚本，可直接构建；若需在 Android Studio 等环境中开发，需重新映射源码与资源路径，并自行声明依赖。
 
-如果您需要：
+**问：为什么命名为 VieY？**
 
-rslsync://, text://, scroll://, scorpion://, molerat://, titan://, misfin://, btsync://, webdav://, webdavs://, davs://, dav://, ircs://, irc://, snmp://, ldap://, cso://, ed2k://, view-source:, freenet:, content://, intent:, android-app://, scp://, http://, https://, mqtts://, mqtt+ssl://, mqtt+ws://, mqtt+wss://, file://, about:, javascript:, news://, fs2you://, bc://, spartan://, nex://, gophers://, gopher://, gemini://, finger://, buss://, curl://, geo:, smsto:, mmsto:, mms:, mailto:, tel:, sms:, qqdl://, flashget://, thunder://, coaps://, magnet:, jsonfeed://, atom://, coap://, mqtt://, rss://, feed://, dns://, whois://, qotd://, daytime://, time://, rtmp://, rtsp://, smtp://, ftps://, sftp://, tftp://, ftp://, nntp://, ntp://, viek://, ws://, wss://
+答：母项目名为 Vie（亦称 VieK），本项目沿用其前缀，后缀 Y 取自作者一位友人的名字。
 
-协议的支持，并且是简体中文用户，可选用 Vie 浏览器
+**问：为什么不上架应用市场？**
+
+答：本项目为兴趣驱动的开源项目，不以分发规模为目标，故仅通过自有渠道发布安装包。
+
+**问：为什么直接信任全部证书，而不采用 TOFU 策略？**
+
+答：早期版本未实现证书固定策略，当前对自签证书采取全信任处理。后续版本计划引入 TOFU 与证书指纹校验。
+
+**问：为什么最初选择 iApp Studio 而非常规编译器？**
+
+答：iApp Studio 支持中文界面，并可在移动设备上直接完成编译打包，便于利用碎片时间开发。项目现已迁移至 Gradle 构建，编译不再受此限制。
+
+**问：如何反馈问题或提出建议？**
+
+答：参见第十节联系方式。
 
 ---
 
+## 九、开源许可
 
-## 6. 使用指南
+本项目采用 Apache License 2.0 许可协议。
 
-### 用户使用指南
+- 允许商业使用、修改、私有化部署与再分发
+- 需保留原始版权声明，修改文件应标注变更
+- 自动授予使用者相关专利许可
+- 未经许可，不得使用项目名称进行推广
 
-**1.** 您可以将本应用当成普通的浏览器使用
+基于本项目二次开发时，请在致谢区、开源协议区或其他可见位置注明：
 
-**2.** 长按底部每一个按键都有对应操作
+> 本项目基于呆毛飘啊飘开源的 VieY 浏览器，原项目地址为 <https://gitee.com/awzx3214/VieYBrowser/>
 
-**3.** 设置中支持多格式的身份证书导入
-
-
-### 开发者使用指南
-
-**1.** **请注意**，本项目使用 iApp Studio 进行打包，项目结构不同于传统项目结构！
-
-**2.** 如果您需要在其他编译器进行编译，必须优先修改本项目的结构！
-
-**3.** 除了 kawaii.viey.browser.xy 文件夹内的 .java 文件外，其余文件均为 kawaii.viey.browser 包名下的类，请注意移动！
-
-**4.** iApp Studio 内置 AndroidX 等库的依赖，无需再次导入依赖，如果需要在其他编译器中编译，必须自行添加 AndroidX 等依赖！
-
-**5.** 本项目使用 **Apache License 2.0 开源许可证** ，后续将申请软件著作权，将受到《中华人民共和国著作权法》的保护！
-  - 允许：商业使用、修改、私有化、再分发
-  - 要求：保留原始版权声明，修改文件需标注变更
-  - 专利授权：自动授予使用者专利使用权
-  - 禁止：使用项目名称进行推广（除非获得许可）
-  - 即您可以免费使用，允许您在使用后制作您自己的软件不开源
-  - 但是，需要保留我的版权信息
-  - 如果基于本应用二次修改，务必将“本项目基于呆毛飘啊飘开源 VieY 浏览器，原项目开源地址为 https://gitee.com/awzx3214/VieYBrowser/ ”放置在感谢区 / 开源协议区或其他区域的可见位置
-  - 如果仅仅使用了部分代码，只需要在开源协议区标明使用了本项目即可
+如仅使用部分代码，在开源协议区标明引用来源即可。
 
 ---
 
+## 十、联系方式
 
-## 7. 技术栈
+如需使用咨询、问题反馈、功能建议，或获取最新源码，可通过以下方式联系作者：
 
-- Android Java + HTML/JavaScript
-- iApp Studio 打包
-- 自定义链接解析
-- 模块化实现
-
----
-
-
-## 8. 简单问答
-
-**1.** 问：为什么功能这么少？
- - 答：因为这个是专门给 smolnet 访问写的，当然不排除后面会在这个基础上把 Vie 的功能全部用 java 重写一遍，毕竟 Vie 太卡了
-
-
-**2.** 问：什么是 smolnet？
- - 答：我不知道咋说，要不问问 AI 吧，它说的仔细，简单来说就是一个没广告的纯文本网页
-
-
-**3.** 问：为什么代码没注释？
- - 答：因为写这个就是兴趣爱好，而且我还是学生时间不多（其实就是懒），一部分代码是从之前的项目“ Vie 浏览器”直接搬过来的，比如 html 文件，和部分 java 文件，好多啊，要不就当 VieY 浏览器是闭源软件算了吧
-
-
-**4.** 问：为什么项目结构这么奇怪？
- - 答：因为我没有用 Android Studio 之类的编译器，所以项目结构看起来就很奇怪，如果要放到 Android Studio 之类编译器的话，嗯，可能得你自己重新编辑一下项目结构了，还有依赖也是
-
-
-**5.** 问：为什么叫 VieY？
- - 答：上一个浏览器叫 Vie（也叫 VieK），我懒得起个新名，就直接在 Vie 后面加上我以前一个好朋友 Y 的名字算了
-
-
-**6.** 问：为什么不上架应用市场？
- - 答：因为好麻烦啊，写这个是纯兴趣爱好，有没有人用其实都行，写这个的过程我就挺高兴了
-
-
-**7.** 问：为什么不做 TOFU 而是直接全部信任证书？
- - 答：后面可能会加上吧，以前我不知道有这东西，直接无视了
-
-**8.** 问：为什么使用 iApp Studio 而不是常规的编译器？
- - 答：因为它支持中文，而且还能在手机上直接打包我的 Java 程序，躺着床上没事干的时候就能写两行，挺方便的
-
-**9.** 问：怎么联系作者 / 反馈问题？
- - 答：下面有联系方式啦
-
----
-
-
-## 9. 联系方式
-
-如果您
-- 不知道怎么使用
-- 想要反馈问题
-- 希望添加新功能
-- 想获取最新版本源码（有时候可能会忘记上传源码，可以联系我提醒一下）
-
-请按照以下途径联系我：
-- QQ → 2171802813
-- email → [VieBrowser@hotmail.com](mailto:VieBrowser@hotmail.com) （注意没有 Y）
-- 酷安 → [@呆毛飘啊飘](https://www.coolapk.com/u/1318094)
-- TG → @Kawaii_R
-
-[VieY 浏览器官网](https://palhube666.wodemo.net/) / [下载途径①](https://dmpap.lanzouw.com/b02dc84ch) / [下载途径②](https://www.123pan.com/s/UML9jv-fk4bh.html) / [下载途径③](https://t.me/Kawaii_V)
+- QQ：2171802813
+- 邮箱：<VieBrowser@hotmail.com>（注意域名不含字母 Y）
+- 酷安：[@呆毛飘啊飘](https://www.coolapk.com/u/1318094)
+- Telegram：@Kawaii_R
