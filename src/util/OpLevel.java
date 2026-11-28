@@ -20,6 +20,7 @@ public class OpLevel {
 	private static final String PREFS = "op_level";
 	private static final String KEY_LEVEL = "level";
 	private static final String KEY_ADMIN = "op_key_admin";
+	private static final String KEY_POWER = "op_key_power";
 
 	private static android.content.SharedPreferences sp(Context c) {
 		return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -34,7 +35,21 @@ public class OpLevel {
 	}
 
 	public static String adminKey(Context c) {
-		return sp(c).getString(KEY_ADMIN, "");
+		return sp(c).getString(KEY_ADMIN, "viey-admin");
+	}
+
+	public static String powerKey(Context c) {
+		return sp(c).getString(KEY_POWER, "viey");
+	}
+
+	/** 自定义某一级的密钥；空串表示恢复默认 */
+	public static void setKey(Context c, int level, String key) {
+		String k = key == null ? "" : key.trim();
+		if (level >= ADMIN) {
+			sp(c).edit().putString(KEY_ADMIN, k.isEmpty() ? "viey-admin" : k).apply();
+		} else {
+			sp(c).edit().putString(KEY_POWER, k.isEmpty() ? "viey" : k).apply();
+		}
 	}
 
 	public static void setAdminKey(Context c, String key) {
@@ -46,17 +61,13 @@ public class OpLevel {
 		if (input == null) return 0;
 		String s = input.trim();
 		if (s.isEmpty()) return 0;
-		if (s.equals("viey-admin")) {
+		if (s.equals(adminKey(c))) {
 			set(c, ADMIN);
 			return ADMIN;
 		}
-		if (s.equals("viey")) {
+		if (s.equals(powerKey(c))) {
 			if (get(c) < POWER) set(c, POWER);
 			return get(c);
-		}
-		if (s.equals(adminKey(c)) && !s.isEmpty()) {
-			set(c, ADMIN);
-			return ADMIN;
 		}
 		return 0;
 	}

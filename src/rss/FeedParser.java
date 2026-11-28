@@ -37,6 +37,18 @@ public class FeedParser {
         }
     }
 
+    /** 带上下文入口：命中列表级 @js: 规则时先走离屏沙箱，失败再退回 CSS 解析 */
+    public static List<Article> parse(android.content.Context c, String body, FeedSource src, String baseUrl) {
+        try {
+            if (RuleJs.needed(src)) {
+                List<Article> js = RuleJs.parse(c, src, baseUrl, body);
+                if (!js.isEmpty()) return js;
+            }
+        } catch (Throwable ignored) {
+        }
+        return parse(body, src, baseUrl);
+    }
+
     public static List<Article> parse(String body, FeedSource src, String baseUrl) {
         if (body == null) return new ArrayList<>();
         String head = body.substring(0, Math.min(body.length(), 512)).toLowerCase(Locale.ROOT);

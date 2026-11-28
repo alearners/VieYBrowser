@@ -136,7 +136,7 @@ public class FeedRepo {
     /** 抓一个源并写缓存；返回抓到的条数，异常向上抛 */
     public static int refresh(Context c, FeedSource s) throws Exception {
         String body = fetch(c, s.url, s);
-        List<FeedParser.Article> items = FeedParser.parse(body, s, s.url);
+        List<FeedParser.Article> items = FeedParser.parse(c, body, s, s.url);
         if (items.isEmpty()) throw new Exception("解析不到条目（检查栏目规则或地址）");
         for (FeedParser.Article a : items) a.source = s.displayTitle();
         saveItems(c, s, items);

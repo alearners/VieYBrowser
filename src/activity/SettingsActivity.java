@@ -69,6 +69,7 @@ public class SettingsActivity extends BaseActivity {
 		textLanguage = addValueItem(getString(R.string.setting_language), v -> showLanguageDialog());
 		textSearchEngine = addValueItem(getString(R.string.search_engine), v -> showSearchEngineDialog());
 		textHomeUrl = addValueItem(getString(R.string.home_url), v -> showHomeUrlDialog());
+		addItem("主页模板（新版搜索框 / 原版链接列表）", v -> showHomeTemplateDialog());
 		textDateFormat = addValueItem(getString(R.string.date_format), v -> showDateFormatDialog());
         
         
@@ -108,6 +109,7 @@ public class SettingsActivity extends BaseActivity {
 		addItem("订阅源管理 / RSS·Atom", v -> startActivity(new Intent(this, FeedActivity.class)));
 		addItem("导入·导出 阅读(Legado) 订阅备份", v -> startActivity(new Intent(this, FeedActivity.class)));
 		addItem("RSS 源仓库（一键导入订阅源）", v -> showRssRepoDialog());
+		addSwitchItem("列表级 @js 规则沙箱（离屏 WebView）", RuleJs.enabled(this), (v, is) -> RuleJs.setEnabled(this, is));
 		addItem("全部订阅文章（聚合时间线）", v -> {
 			Intent it = new Intent(this, FeedItemsActivity.class);
 			it.putExtra(FeedItemsActivity.EXTRA_ALL, true);
@@ -892,14 +894,32 @@ public class SettingsActivity extends BaseActivity {
 			.show();
 	}
 
+	private void showHomeTemplateDialog() {
+		String cur = VieYApp.getHomeUrl(this);
+		boolean classic = cur != null && cur.contains("HomeClassic");
+		String[] items = {"新版搜索框主页", "原版链接列表主页"};
+		new android.app.AlertDialog.Builder(this)
+			.setTitle("主页模板")
+			.setSingleChoiceItems(items, classic ? 1 : 0, (d, w) -> {
+				String u = w == 1 ? "viek://home/html/HomeClassic.html" : "viek://home/html/VieY.html";
+				VieYApp.setHomeUrl(SettingsActivity.this, u);
+				if (textHomeUrl != null) textHomeUrl.setText(u);
+				Toast.makeText(SettingsActivity.this, "已切换，回主页生效", Toast.LENGTH_SHORT).show();
+				d.dismiss();
+			})
+			.setNegativeButton("取消", null)
+			.show();
+	}
+
 	private void showOpLevelDialog() {
 		LinearLayout box = new LinearLayout(this);
 		box.setOrientation(LinearLayout.VERTICAL);
 		box.setPadding(i.dp2px(20), i.dp2px(12), i.dp2px(20), i.dp2px(4));
 
 		TextView info = makeInfoText("当前：" + OpLevel.label(OpLevel.get(this))
-			+ "\n\n等级 2 密钥：viey（协议工具 / 插件 / 备份）"
-			+ "\n等级 3 密钥：viey-admin（全部，含实验项）", 12, R.color.text_secondary, false);
+			+ "\n\n等级 2 密钥：" + OpLevel.powerKey(this) + "（协议工具 / 插件 / 备份）"
+			+ "\n等级 3 密钥：" + OpLevel.adminKey(this) + "（全部，含实验项）"
+			+ "\n\n密钥可在「设定密钥」里自行修改。", 12, R.color.text_secondary, false);
 		info.setPadding(0, 0, 0, i.dp2px(8));
 		box.addView(info);
 
@@ -921,10 +941,31 @@ public class SettingsActivity extends BaseActivity {
 					Toast.makeText(this, "密钥不正确", Toast.LENGTH_SHORT).show();
 				}
 			})
+			.setNeutralButton("设定密钥", (d, w) -> showSetKeyDialog())
 			.setNegativeButton("取消", null)
-			.setNeutralButton("降为等级 1", (d, w) -> {
-				OpLevel.set(this, OpLevel.NORMAL);
-				recreate();
+			.show();
+	}
+
+	private void showSetKeyDialog() {
+		String[] rows = {"等级 2 密钥（进阶）", "等级 3 密钥（管理）"};
+		new android.app.AlertDialog.Builder(this)
+			.setTitle("设定等级密钥")
+			.setItems(rows, (d, w) -> {
+				final int level = w == 0 ? OpLevel.POWER : OpLevel.ADMIN;
+				EditText et = new EditText(this);
+				et.setSingleLine(true);
+				et.setTextSize(14);
+				et.setHint("留空恢复默认");
+				et.setText(level >= OpLevel.ADMIN ? OpLevel.adminKey(this) : OpLevel.powerKey(this));
+				new android.app.AlertDialog.Builder(this)
+					.setTitle(rows[w])
+					.setView(et)
+					.setPositiveButton("保存", (dd, ww) -> {
+						OpLevel.setKey(this, level, et.getText().toString());
+						Toast.makeText(this, "已保存，下次解锁使用新密钥", Toast.LENGTH_SHORT).show();
+					})
+					.setNegativeButton("取消", null)
+					.show();
 			})
 			.show();
 	}
